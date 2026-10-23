@@ -38,7 +38,7 @@ The hackathon tests the real problem, but only its agent-to-agent half. The gap 
 
 The working assumption is CT's platform in CT Cloud and the Cisco container on AWS, over public IPs. CT initiates A2A; the CP agent initiates MCP. The alternative is CT's master and digital twin in a Cisco lab over VPN. Run the full exchange end to end before the event.
 
-### The scenario: propose a lower-latency path
+### The scenario: latency-aware path planning under capacity constraints
 
 CE-A in metro domain A connects to CE-B in metro domain B across an IS-IS level-2 core. CT's platform learns the twin's topology through BGP-LS.
 
@@ -48,9 +48,11 @@ CE-A in metro domain A connects to CE-B in metro domain B across an IS-IS level-
 | P2 | Alternative path through the core | 25 ms |
 | P3, candidate | CE-A → PE-A → E3-A → I3-B → PE-B → CE-B | 12 ms |
 
-P1 breaches the service's latency objective. The master asks for a path that meets the objective, has enough spare bandwidth, and keeps the VPN reachable. The expected answer is P3, confirmed by CT's validation agent (CT's demo uses 20 ms and ends with evidence E-003, digital twin, PASS).
+This first use case is latency-aware path planning under capacity constraints, rather than long-term capacity forecasting. P1 breaches the service's latency objective. The master asks for a path that meets the objective, has enough spare bandwidth, and keeps the VPN reachable. The expected answer is P3, confirmed by CT's validation agent (CT's demo uses 20 ms and ends with evidence E-003, digital twin, PASS).
 
 For the baseline fixture, agree a maximum one-way latency of 20 ms and pin the topology, traffic, routing assumptions, and measurement window. P2 fails that latency constraint; P3 is the expected answer only if the fixture also demonstrates sufficient bandwidth and VPN reachability. Record those values before the run. The numbers are illustrative until CT and Cisco approve the fixture. Modified inputs may correctly produce another path or no feasible path; the test must never force P3 regardless of the data.
+
+Define available bandwidth before approving the fixture: measured spare capacity, unreserved bandwidth, and a policy-limited estimate are different quantities. Record the chosen definition, traffic direction, measurement window, and how link values determine path availability. Carry the definition in the contract or referenced snapshot metadata; a numeric value and unit alone are insufficient.
 
 ```mermaid
 sequenceDiagram
@@ -91,6 +93,8 @@ CT's existing model (slide *Task Model / Evidence Model in Configuration Generat
 ### Carry a versioned network contract in A2A
 
 Use a versioned planning request/result contract carried in standard A2A 1.0 message data parts and result artifacts. This hackathon does not define or negotiate an A2A protocol extension. Agree the application contract identifier, supported versions, required fields, and unsupported-version behavior before testing. The JSON examples below identify that contract through `contract: "latency-planning/v1"` inside the application data.
+
+Before integration, express the application request and result contract as versioned JSON Schema, with required fields, units, error outcomes, and unsupported-version behavior. Pair it with an approved input fixture and expected results, including a no-feasible-path case. Schema validation checks structure; semantic checks still require documented definitions and fixture evidence. These are preparation deliverables, not artifacts already supplied by this document.
 
 The useful finding is which network semantics required an additional agreement, whether existing models already define them, and whether the issue is network-specific or generic. For each field below, distinguish the core A2A carrier from our application-defined meaning. Document that meaning in the request/result contract and record any remaining out-of-band agreements.
 
@@ -246,7 +250,7 @@ A reviewer at the BoF will ask four questions. The plan answers each one in adva
 
 *"You agreed a custom mapping with one partner. So what?"* If CT and Cisco simply agree the tables and then run them, the event only shows that a bilateral agreement works. That is exactly the per-integration translation the problem statement says does not scale.
 
-The evidence is the work it took to reach agreement. From the first technical exchange with CT, log every question the two sides had to settle in [`Negotiation-log.md`](Negotiation-log.md): the question, which table row it belongs to, the options considered, the decision, where the decision is carried (core A2A, the versioned application contract, or out-of-band only), how many rounds it took, and whether a third implementation would need the same agreement. The event then confirms that the agreed mapping works, and records anything the negotiation missed.
+The evidence is the work it took to reach agreement. From the first technical exchange with CT, log every question the two sides had to settle in `Negotiation-log.md` (planned): the question, which table row it belongs to, the options considered, the decision, where the decision is carried (core A2A, the versioned application contract, or out-of-band only), how many rounds it took, and whether a third implementation would need the same agreement. For each finding, record the two interpretations, the operational consequence, whether an existing specification or model covers it, and how it was resolved. Record whether another implementation could reuse that resolution without bilateral clarification. The event then confirms that the agreed mapping works, and records anything the negotiation missed.
 
 ### Organic findings count more than injected ones
 
@@ -256,7 +260,7 @@ Tag every finding as **organic** (found during negotiation or integration, witho
 
 ### Write down the expected findings first
 
-*"You found what you were looking for."* CT and Cisco are both authors of the problem statement. Before the first integration run, each side commits its predicted findings to [`Expected-findings.md`](Expected-findings.md), with the date. The gap report then lists which predictions held, which did not, and which findings nobody predicted. Predictions that failed, and findings that existing specifications were enough, get equal space.
+*"You found what you were looking for."* CT and Cisco are both authors of the problem statement. Before the first integration run, each side commits its predicted findings to `Expected-findings.md` (planned), with the date. The gap report then lists which predictions held, which did not, and which findings nobody predicted. Predictions that failed, and findings that existing specifications were enough, get equal space.
 
 ### Bring in someone outside the two teams
 
@@ -269,11 +273,11 @@ Tag every finding as **organic** (found during negotiation or integration, witho
 
 | Status | Work |
 | --- | --- |
-| Prepare before arrival | The task, status, and evidence tables worked out with CT, with the negotiation log kept throughout; expected findings committed by both sides; the versioned request/result contract agreed; an outside reviewer identified; endpoints and credentials exchanged through an agreed secure channel (never in this repository); A2A and MCP versions; the snapshot in the digital twin; a callable engine |
+| Prepare before arrival | The task, status, and evidence tables worked out with CT, with the negotiation log kept throughout; expected findings committed by both sides; the versioned request/result contract and JSON Schema agreed, with approved inputs and expected results; an outside reviewer identified; endpoints and credentials exchanged through an agreed secure channel (never in this repository); A2A and MCP versions; the snapshot in the digital twin; a callable engine |
 | Core | One A2A delegation with MCP data retrieval; the task fields and status mapping exercised; one combined evidence view; a validated recommendation presented for review |
-| Core failure cases | "Completed, but not validated"; a task the CP agent cannot finish; one capacity-meaning mismatch and corrected rerun; one broken evidence record |
-| Core deliverable | The negotiation log, the filled-in tables, the versioned request/result contract, a reproducible exchange, the failure cases, and a short gap report that leads with organic findings and scores the expected findings |
-| Stretch | An independent client constructs the task and checks its evidence; apply P3 in the digital twin and re-measure; a latency-definition mismatch; a changed snapshot that requires revalidation |
+| Core checks | "Completed, but not validated"; investigate and document one organic mismatch from integration, with a corrected rerun if one is found. Finding no mismatch is a valid result; do not manufacture one. |
+| Core deliverable | The negotiation log, the filled-in tables, the versioned request/result contract, a reproducible exchange, the core checks, and a short gap report that leads with organic findings and scores the expected findings |
+| Stretch | Prioritize an independent client constructing the task and checking its evidence; then additional failure cases (unfinished task, injected capacity mismatch, broken evidence); apply P3 in the digital twin and re-measure; a latency-definition mismatch; a changed snapshot that requires revalidation |
 | Deferred | Agent registration and lifecycle, intervention and recovery, live ingestion, production authorization tests, and any live network change |
 
 The CP agent has recommendation-only authority from the start. Use CT's existing master; do not build a new orchestrator. Check the known result without claiming to benchmark the engine.
@@ -288,16 +292,16 @@ The CP agent has recommendation-only authority from the start. Use CT's existing
 | Result support | Per-candidate constraint checks agree with retained output and the expected outcome |
 | Validation | CT validation agent's PASS, FAIL, or INCONCLUSIVE for the same task, candidate, constraints, and compatible twin state; only supported PASS establishes validation |
 
-A completed status alone is insufficient. The master shows "computed" until validation passes and flags missing or mismatched evidence as unverified. Engine execution, recommendation correctness, and measured service improvement are separate claims; only the first two are checked without the stretch goal.
+A completed status alone is insufficient. The master shows "computed" until validation passes and flags missing or mismatched evidence as unverified. Engine execution, consistency with the approved fixture and digital-twin model, and measured service improvement are separate claims. Core scope checks the first two within the recorded assumptions; it does not establish general recommendation correctness or a live-network outcome.
 
 ## The key tests
 
-The [test plan](Test-plan.md) has the full list and pass conditions. Except for the status test, which also catches organic differences, these are injected demonstrations; the organic findings come from the negotiation log and the integration runs. The tests that matter most:
+The checks below define the initial pass conditions; a fuller `Test-plan.md` is planned. The successful baseline and "completed, but not validated" are core. Investigate organic mismatches during integration; the remaining injected failures are stretch work. An intentionally triggered failure demonstrates a checker, not an independently discovered interoperability gap.
 
 - **Completed, but not validated.** The CP agent returns `COMPLETED`, then CT's validation agent returns FAIL. The master must not present a validated path.
-- **Same word, different meaning in status.** Run a task the CP agent cannot finish and record the A2A state and the CT status on each side.
-- **A valid message with the wrong meaning.** The MCP data puts P3's total capacity (100G) where the CP agent expects available bandwidth. The message is schema-valid but P3 looks roomier than it is. Detect or expose it, make the mapping explicit, and rerun.
-- **Broken evidence.** Alter one reference, such as a snapshot ID that does not match the task. The master flags the result as unverified.
+- **Stretch: same word, different meaning in status.** Run a task the CP agent cannot finish and record the A2A state and the CT status on each side.
+- **Stretch: a valid message with the wrong meaning.** The MCP data puts P3's total capacity (100G) where the CP agent expects available bandwidth. The message is schema-valid but P3 looks roomier than it is. Compare the source-field mapping and metric metadata against the approved fixture, make the mapping explicit, and rerun. A schema-valid number alone cannot reveal this substitution. Record whether detection came from an automated semantic check, fixture comparison, or human review; do not claim automatic detection without such a check.
+- **Stretch: broken evidence.** Alter one reference, such as a snapshot ID that does not match the task. The master flags the result as unverified.
 - **Stretch: apply the path in the digital twin.** A controller function in the twin applies P3 and the twin re-measures latency. Acceptance, execution, and the fresh measurement are reported separately. This is the only test that reaches the v2 deck's agent-to-controller example.
 
 A deliberately incomplete contract does not establish a defect in A2A or MCP. Record whether existing models or the versioned application contract resolve each mismatch, or whether a further agreement was needed.
@@ -324,14 +328,16 @@ Before applying an approved plan, a separate authorized executor checks current 
 
 ## Implementation and follow-up
 
-| Need | Read |
+The companion files below are planned or awaiting upload; they are not yet available in this repository. The core scope, checks, and evidence requirements are defined above so the plan can be reviewed on its own.
+
+| Need | Planned file |
 | --- | --- |
-| Build the integration and data contract | [Implementation notes](Implementation-notes.md) |
-| Define the specialist's behavior and result evidence | [Skills and rules](Capacity-Planning-Agent-Skills-and-Rules.md) |
-| Run the demo and record findings | [Test plan](Test-plan.md) |
-| Record every agreement made with CT | [Negotiation log](Negotiation-log.md) |
-| Commit predictions before the first run | [Expected findings](Expected-findings.md) |
-| Review platform sketches, topology, and lab options | [Working whiteboard](IETF127-hackathon-proposal.excalidraw) |
+| Build the integration and data contract | `Implementation-notes.md` |
+| Define the specialist's behavior and result evidence | `Capacity-Planning-Agent-Skills-and-Rules.md` |
+| Run the demo and record findings | `Test-plan.md` |
+| Record every agreement made with CT | `Negotiation-log.md` |
+| Commit predictions before the first run | `Expected-findings.md` |
+| Review platform sketches, topology, and lab options | `IETF127-hackathon-proposal.excalidraw` |
 
 Classify findings as implementation defects, configuration issues, missing profiles or mappings, or specification gaps. Assess A2A, MCP, and relevant IETF work including ICON before proposing an AINETOPS deliverable. One integration establishes feasibility and candidate gaps; more independent implementations are needed before generalizing.
 
