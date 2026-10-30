@@ -1,16 +1,34 @@
 # AINETOPS IETF 127 hackathon
 
-Test whether an independently developed capacity-planning agent (the "CP agent") can perform its role on China Telecom's (CT's) Core Agentic AI platform. The first event lasts a day and a half. CT's master agent delegates one task over A2A, the CP agent reads data from CT's digital twin over MCP and runs an existing engine, and it returns a recommendation with evidence that the master can check.
+## In brief
 
-A working connection is not the point. The experiment records **what CT and Cisco still had to agree on outside A2A and MCP** for the task, its status, and its evidence to mean the same thing on both sides. Existing specifications proving sufficient is a valid outcome; a new protocol or working group is not assumed.
+This is a plan for a day-and-a-half experiment at the Internet Engineering Task Force (IETF) 127 hackathon. China Telecom (CT) and Cisco will test whether their independently developed agents can work together on a network-planning task. CT's master agent asks a Cisco-built capacity-planning agent (the "CP agent") to find a better network path. The master agent sends the request using Agent2Agent (A2A). The CP agent reads network information from CT's digital twin using the Model Context Protocol (MCP), runs a planning engine, and returns a recommendation with evidence.
+
+The experiment tests whether both implementations understand the task, its status, and its supporting evidence the same way. It records what CT and Cisco still need to agree on beyond A2A and MCP. The findings can inform AINETOPS and related standards discussions without presuming that a new protocol, profile, or working group is needed. Existing specifications proving sufficient is a valid outcome.
+
+## What happens during the hackathon
+
+1. **Agree on the test.** CT and Cisco pin a digital-twin snapshot and define the request: find a path that meets the agreed latency, bandwidth, and reachability requirements.
+2. **Delegate the task.** CT's master agent sends the request to the CP agent over A2A.
+3. **Compute a recommendation.** The CP agent retrieves the agreed network data through MCP, runs the planning engine, and returns its recommended path and evidence.
+4. **Check the recommendation.** CT's validation agent checks the candidate against the digital twin and reports PASS, FAIL, or INCONCLUSIVE.
+5. **Report what the evidence supports.** The master presents a path as validated only when the evidence matches and validation passes. Otherwise, it reports that the path was computed but not validated.
+
+For this experiment, CT provides an emulated test network. The experiment's main output is a record of what the two implementations could understand from the protocols and agreed contract, what needed further agreement, and what remains unresolved.
 
 ## The problem it tests
 
-The [AINETOPS problem statement](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/draft-xxx-ainetops-problem-statement-00-v1.md) ([PDF](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/AINETOps%20Problem%20Statement.pdf)) argues that multi-vendor agents fail to interoperate "not because of any lack of connectivity or transport", but because there is no shared **task model** or **evidence model** (R-5 and R-6).
+The [AINETOPS problem statement](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/draft-xxx-ainetops-problem-statement-00-v1.md) ([PDF](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/AINETOps%20Problem%20Statement.pdf)) states that multi-agent interoperability could fail not because of any lack of connectivity or transport, but because there is no shared **task model** or **evidence model** (R-5 and R-6).
 
-The v2 discussion deck (*AINETOPS-Problem-Statement-v2-with-diagrams*, 29 September 2026) narrows this to two candidate standards outputs: **A. agent operational lifecycle**, and **B. a network task and evidence profile** that reuses generic task protocols such as A2A. Its central example is one "complete" read three ways: a controller *accepted* an operation, an agent reported its task *complete*, and another agent *closed the incident* while probes still showed the fault. The deck asks deployments for one kind of evidence above all: "which two implementations interpreted the same operation differently?"
+The v2 discussion deck (*AINETOPS-Problem-Statement-v2-with-diagrams*, 29 September 2026) narrows this to two candidate standards outputs:
+**A. agent operational lifecycle** and
+**B. a network task and evidence profile** that reuses generic task protocols such as A2A.
 
-This hackathon seeks that evidence for output B; it may find that existing mechanisms and documented mappings are sufficient. CT and Cisco built their agents independently, and CT already has its own task and evidence model.
+A key distinction is whether an operation was accepted, a task was completed, or the intended network outcome was verified. Those claims require different evidence.
+
+This hackathon is an attempt to test the feasibility of (B) by prototyping. It may find that existing mechanisms and documented mappings are sufficient. Or it may identify areas where we may need additional work.
+
+CT and Cisco built their agents independently. CT already has its own task and evidence model.
 
 | Problem area (v2 deck) | Covered here? |
 | --- | --- |
@@ -36,7 +54,7 @@ The hackathon tests the real problem, but only its agent-to-agent half. The gap 
 | CP agent, MCP client and data adapter | Cisco, one Docker container | Accepts the task, fetches data, builds the engine input, returns the result and evidence |
 | Planning engine | Cisco | Computes candidate paths with latency and available bandwidth. Confirm its APIs first. |
 
-The working assumption is CT's platform in CT Cloud and the Cisco container on AWS, over public IPs. CT initiates A2A; the CP agent initiates MCP. The alternative is CT's master and digital twin in a Cisco lab over VPN. Run the full exchange end to end before the event.
+The working assumption is CT's platform in CT Cloud and the Cisco container on AWS, over public IPs. CT initiates A2A; the CP agent initiates MCP. An alternative, still to be agreed, is CT's master and digital twin in a Cisco lab over VPN. Run the full exchange end to end before the event.
 
 ### The scenario: latency-aware path planning under capacity constraints
 
@@ -48,7 +66,7 @@ CE-A in metro domain A connects to CE-B in metro domain B across an IS-IS level-
 | P2 | Alternative path through the core | 25 ms |
 | P3, candidate | CE-A → PE-A → E3-A → I3-B → PE-B → CE-B | 12 ms |
 
-This first use case is latency-aware path planning under capacity constraints, rather than long-term capacity forecasting. P1 breaches the service's latency objective. The master asks for a path that meets the objective, has enough spare bandwidth, and keeps the VPN reachable. The expected answer is P3, confirmed by CT's validation agent (CT's demo uses 20 ms and ends with evidence E-003, digital twin, PASS).
+This first use case is latency-aware path planning under capacity constraints. P1 breaches the service's latency objective. The master asks for a path that meets the objective, has enough spare bandwidth, and keeps the VPN reachable. The expected answer is P3, which needs to be confirmed by CT's validation agent.
 
 For the baseline fixture, agree a maximum one-way latency of 20 ms and pin the topology, traffic, routing assumptions, and measurement window. P2 fails that latency constraint; P3 is the expected answer only if the fixture also demonstrates sufficient bandwidth and VPN reachability. Record those values before the run. The numbers are illustrative until CT and Cisco approve the fixture. Modified inputs may correctly produce another path or no feasible path; the test must never force P3 regardless of the data.
 
@@ -78,17 +96,35 @@ sequenceDiagram
     Note over O,V: First-event boundary — no live network change
 ```
 
-### Data retrieval and validation boundaries
+### Data retrieval and validation
 
-The proposed core flow has the CP agent retrieve its inputs through CT's MCP server. The master may perform initial discovery first, as the whiteboard demo shows; in that case it passes a pinned snapshot reference and the specialist retrieves that same version. Agree how the server exposes a consistent snapshot across topology, traffic, and latency tools. If it cannot, record source timestamps and consistency limitations and reject insufficient inputs.
+#### Data retrieval
 
-For core scope, CT validation means a separate simulation or model check of the proposed candidate against the agreed constraints and compatible twin state. Report simulated/predicted latency and reachability, with PASS, FAIL, or INCONCLUSIVE and the validation method. Only PASS with matching evidence supports a validated recommendation. If CT validation actually installs a configuration in an isolated emulator and probes traffic, explicitly move that execution-and-measurement work into core scope before the event; do not describe it simultaneously as deferred stretch work. Neither method establishes a live-network outcome.
+- The CP agent retrieves topology, traffic, and latency data from CT's MCP server.
+- If CT's master agent performs discovery first, it passes the snapshot ID to the CP agent. The CP agent must use that same snapshot.
+- Agree how the MCP server provides a consistent snapshot across data sources. If it cannot, record the source timestamps and limitations.
+- The CP agent must not produce a recommendation when required inputs are missing or too inconsistent to support the requested checks.
 
-## The task model and the evidence model
+#### Validation
+
+CT's validation agent checks the proposed path against the agreed constraints and a compatible digital-twin state. For the core event, validation is a simulation or model check; it does not apply a configuration or measure live traffic.
+
+The validation result includes:
+
+- `PASS`, `FAIL`, or `INCONCLUSIVE`
+- The validation method and digital-twin state used
+- Predicted latency, available-bandwidth, and reachability checks
+- Evidence linked to the task, candidate path, and constraints
+
+The master may call a recommendation validated only when the result is `PASS` and its evidence matches the planning result. Otherwise, it reports the recommendation as computed but not validated.
+
+Applying a path in the digital twin and measuring it afterward is stretch scope. If the event includes that work in its core validation, agree on the change before the event and update the scope accordingly. Neither simulated validation nor digital-twin measurement establishes a live-network outcome.
+
+## Technical reference: task and evidence model
 
 This is the heart of the hackathon. The path computation is the vehicle; the task and evidence around it are what we test. Work out these tables with CT before the event and keep a [negotiation log](#the-negotiation-log-is-the-primary-evidence) while doing it; the event then checks that the agreed mapping works.
 
-CT's existing model (slide *Task Model / Evidence Model in Configuration Generation*) has these task fields: `Task_id`, `Type`, `Goal`, `Target`, `Mode` (for example `PLAN (READ_ONLY)`), `Window`, `Current-step`, `Current-Job`, `Process_flow`, `Status`, `Exist_reason`, `Check_point`, `Device`, `Process_result`, `Output`. Its evidence is `dict(step, JSON)`, used today only in the validation stage. CT should confirm whether these fields are what its platform implements or an illustration for the configuration-generation use case.
+CT's existing model (slide *Task Model / Evidence Model in Configuration Generation*) has these task fields: `Task_id`, `Type`, `Goal`, `Target`, `Mode` (for example `PLAN (READ_ONLY)`), `Window`, `Current-step`, `Current-Job`, `Process_flow`, `Status`, `Exist_reason`, `Check_point`, `Device`, `Process_result`, `Output`. Its evidence is `dict(step, JSON)`, used today only in the validation stage. CT should confirm whether these fields are what its platform implements or an illustration for the configuration-generation use case. The spelling `Exist_reason` is retained from the supplied model; confirm whether the implemented field is `Exist_reason` or `Exit_reason` before finalizing the mapping.
 
 ### Carry a versioned network contract in A2A
 
@@ -153,7 +189,7 @@ The fields combine R-6 (provenance, confidence, trace context, verification) wit
 | Scope | CE-A to CE-B; candidates P1, P2, P3 | P3 |
 | Inputs | Snapshot IDs retrieved over MCP | Compatible twin state ID, same candidate and constraints; explain any state differences |
 | Operation reference | Engine operation, parameters, run ID | Simulation ID |
-| Result | Per-candidate latency and bandwidth checks, including why P2 fails | Simulated/predicted latency and reachability checks for core; fresh probe measurements only if the stretch execution runs |
+| Result | Per-candidate latency and bandwidth checks, including why P2 fails | Simulated/predicted latency, available-bandwidth, and reachability checks for core; fresh probe measurements only if the stretch execution runs |
 | Verification | Engine-backed prediction with traceable output; not independently validated | PASS, FAIL, or INCONCLUSIVE, with method and checks performed |
 | Limitations | Model prediction and assumptions | Twin/model validation; record shared assumptions and limits of independence |
 | Access | Reference to full engine output, and who may read it | Reference to full simulation output |
