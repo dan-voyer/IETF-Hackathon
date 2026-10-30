@@ -61,14 +61,25 @@ The working assumption is CT's platform in CT Cloud and the Cisco container on A
 The demo starts with a small IPv6 planning model: six nodes, six circuits, twelve interfaces, one traffic demand named `A_to_D`, and two existing Segment Routing LSPs, `Tunnel100` and `Tunnel200`. Every interface has a configured capacity of **1,000 Mbps**. There are two branches between A and D:
 
 ```mermaid
-flowchart TD
-    A["A"] --- B1["B1"]
-    A --- B2["B2"]
-    B1 --- C1["C1"]
-    B2 --- C2["C2"]
-    C1 --- D["D"]
-    C2 --- D
+flowchart LR
+    A(["A — source"]) -->|"600 Mbps"| B1["B1"]
+    B1 --> C1["C1"]
+    C1 --> D(["D — destination"])
+    A -->|"600 Mbps"| B2["B2"]
+    B2 --> C2["C2"]
+    C2 --> D
+
+    classDef endpoint fill:#f1f5f9,stroke:#475569,color:#0f172a,stroke-width:2px
+    classDef upper fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px
+    classDef lower fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:2px
+    class A,D endpoint
+    class B1,C1 upper
+    class B2,C2 lower
+    linkStyle 0,1,2 stroke:#2563eb,stroke-width:3px
+    linkStyle 3,4,5 stroke:#15803d,stroke-width:3px
 ```
+
+*Optimized simulation: the 1,200 Mbps A_to_D demand is distributed across the two branches, consistent with 600 Mbps per branch. Every link has 1,000 Mbps capacity, giving 60% utilization. Arrows show the A-to-D traffic direction; they do not imply one-way physical circuits.*
 
 This replaces the earlier illustrative 100G P1/P2/P3 scenario. The values below come from the supplied screenshots and the running Capacity Planning AI Agent session. They are simulation results for this model, not measurements from a live network.
 
