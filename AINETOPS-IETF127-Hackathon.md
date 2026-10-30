@@ -2,13 +2,13 @@
 
 ## In brief
 
-This is a plan for a day-and-a-half experiment at the Internet Engineering Task Force (IETF) 127 hackathon. China Telecom (CT) and Cisco will test whether their independently developed agents can work together on a network-planning task. CT's master agent asks a Cisco-built capacity-planning agent (the "CP agent") to find a better network path. The master agent sends the request using Agent2Agent (A2A). The CP agent reads network information from CT's digital twin using the Model Context Protocol (MCP), runs a planning engine, and returns a recommendation with evidence.
+This is a plan for a day-and-a-half experiment at the Internet Engineering Task Force (IETF) 127 hackathon. China Telecom (CT) and Cisco will test whether their independently developed agents can work together on a network-planning task. CT's master agent asks a Cisco-built capacity-planning agent (the "CP agent") to find a network path with more bandwidth headroom. The master agent sends the request using Agent2Agent (A2A). The CP agent reads network information from CT's digital twin using the Model Context Protocol (MCP), runs a planning engine, and returns a recommendation with evidence.
 
 The experiment tests whether both implementations understand the task, its status, and its supporting evidence the same way. It records what CT and Cisco still need to agree on beyond A2A and MCP. The findings can inform AINETOPS and related standards discussions without presuming that a new protocol, profile, or working group is needed. Existing specifications proving sufficient is a valid outcome.
 
 ## What happens during the hackathon
 
-1. **Agree on the test.** CT and Cisco pin a digital-twin snapshot and define the request: find a path that meets the agreed latency, bandwidth, and reachability requirements.
+1. **Agree on the test.** CT and Cisco pin a digital-twin snapshot and define the request: find a path that meets the agreed bandwidth, utilization, and reachability requirements.
 2. **Delegate the task.** CT's master agent sends the request to the CP agent over A2A.
 3. **Compute a recommendation.** The CP agent retrieves the agreed network data through MCP, runs the planning engine, and returns its recommended path and evidence.
 4. **Check the recommendation.** CT's validation agent checks the candidate against the digital twin and reports PASS, FAIL, or INCONCLUSIVE.
@@ -52,25 +52,34 @@ The hackathon tests the real problem, but only its agent-to-agent half. The gap 
 | MCP server | CT | Read-only topology, telemetry, and link performance from the digital twin |
 | Digital twin (emulator) | CT | Emulates the test network. No live network is touched. |
 | CP agent, MCP client and data adapter | Cisco, one Docker container | Accepts the task, fetches data, builds the engine input, returns the result and evidence |
-| Planning engine | Cisco | Computes candidate paths with latency and available bandwidth. Confirm its APIs first. |
+| Planning engine | Cisco | Computes candidate paths using traffic demand, link capacity, and predicted utilization. Confirm its APIs first. |
 
 The working assumption is CT's platform in CT Cloud and the Cisco container on AWS, over public IPs. CT initiates A2A; the CP agent initiates MCP. An alternative, still to be agreed, is CT's master and digital twin in a Cisco lab over VPN. Run the full exchange end to end before the event.
 
-### The scenario: latency-aware path planning under capacity constraints
+### The scenario: bandwidth-aware path planning
 
-CE-A in metro domain A connects to CE-B in metro domain B across an IS-IS level-2 core. CT's platform learns the twin's topology through BGP-LS.
+CE-A in domain A connects to CE-B in domain B. The supplied use-case diagram shows the following utilization and nominal capacity values. CT's platform supplies the topology and traffic snapshot used to interpret them.
 
-| Path | Route | Latency |
-| --- | --- | --- |
-| P1, current | CE-A → PE-A → E1-A → I1-B → PE-B → CE-B | 100 ms |
-| P2 | Alternative path through the core | 25 ms |
-| P3, candidate | CE-A → PE-A → E3-A → I3-B → PE-B → CE-B | 12 ms |
+| Path | Role and route shown | Utilization | Nominal capacity | Illustrative unused capacity |
+| --- | --- | --- | --- | --- |
+| P1 | Primary, via PE-A → E1 → I1 → PE-B | 92% | 100 Gbit/s | 8 Gbit/s |
+| P2 | Backup; exact link sequence to confirm | 55% | 100 Gbit/s | 45 Gbit/s |
+| P3 | Candidate, via PE-A → E3 → I3 → PE-B | 30% | 100 Gbit/s | 70 Gbit/s |
 
-This first use case is latency-aware path planning under capacity constraints. P1 breaches the service's latency objective. The master asks for a path that meets the objective, has enough spare bandwidth, and keeps the VPN reachable. The expected answer is P3, which needs to be confirmed by CT's validation agent.
+Unused capacity here is calculated as nominal capacity × (1 − utilization). These figures are illustrative headroom estimates from the screenshot, not bandwidth reservations or proof of end-to-end available bandwidth. Confirm the utilization direction, measurement window, aggregation method, and every link on each path, including the access segments. P2's dashed line does not establish its exact route or whether it shares resources with P3.
 
-For the baseline fixture, agree a maximum one-way latency of 20 ms and pin the topology, traffic, routing assumptions, and measurement window. P2 fails that latency constraint; P3 is the expected answer only if the fixture also demonstrates sufficient bandwidth and VPN reachability. Record those values before the run. The numbers are illustrative until CT and Cisco approve the fixture. Modified inputs may correctly produce another path or no feasible path; the test must never force P3 regardless of the data.
+The master asks the CP agent to recommend moving the CE-A-to-CE-B service from heavily utilized P1 to a path with more bandwidth headroom while preserving VPN reachability. The objective is to minimize the candidate path's predicted maximum link utilization after the move, subject to the agreed utilization ceiling and bandwidth requirements. Latency is not the selection objective for this first experiment.
 
-Define available bandwidth before approving the fixture: measured spare capacity, unreserved bandwidth, and a policy-limited estimate are different quantities. Record the chosen definition, traffic direction, measurement window, and how link values determine path availability. Carry the definition in the contract or referenced snapshot metadata; a numeric value and unit alone are insufficient.
+**Proposed test fixture, to be approved by CT and Cisco:** move an existing 20 Gbit/s service from P1, with an 80% maximum link-utilization ceiling after the move. Neither value comes from the screenshot. Assume that P1's current load includes this service, that the candidate core paths have separate bottlenecks, and that shared/access links remain within the ceiling. Pin those assumptions in the fixture; the actual implementation must recompute every affected link, subtracting and adding the service only where its route changes.
+
+| Candidate move | Predicted P1 utilization | Predicted destination utilization | Destination unused capacity after move | Expected decision |
+| --- | --- | --- | --- | --- |
+| P1 → P2 | 72% | 75% | 25 Gbit/s | Feasible under the proposed fixture, but less headroom than P3 |
+| P1 → P3 | 72% | 50% | 50 Gbit/s | Preferred, subject to all link and reachability checks |
+
+P3 is the expected recommendation because it has the lower predicted maximum link utilization under this fixture. P2 must not be reported as infeasible merely because P3 is preferred. Keeping the service on P1 leaves utilization at 92%; do not add the existing service a second time. Changed inputs may select P2 or yield no feasible alternative. Missing route or load information must produce an insufficient-input outcome rather than an invented recommendation.
+
+Define available bandwidth before approving the fixture: measured unused capacity, unreserved bandwidth, and policy-limited headroom are different quantities. For the proposed 80% ceiling, P3's policy headroom before the move is 50 Gbit/s, while its unused nominal capacity is 70 Gbit/s. Record the chosen definitions, traffic direction, measurement window, and how link values determine path feasibility in the contract or referenced snapshot metadata.
 
 ```mermaid
 sequenceDiagram
@@ -79,9 +88,9 @@ sequenceDiagram
     participant P as CP agent (Cisco container)
     participant S as CT MCP server / digital twin
     participant V as CT validation agent
-    O->>M: Find a lower-latency path between CE-A and CE-B
+    O->>M: Find a path with more bandwidth headroom between CE-A and CE-B
     M->>P: A2A task: endpoints, objective, constraints, snapshot, read-only, evidence required
-    P->>S: MCP: topology, interface counters, link latency
+    P->>S: MCP: topology, link capacities, utilization, service traffic
     S-->>P: Data with identifiers, units, timestamps
     Note over P: Check meaning, build engine input, run engine
     P-->>M: A2A COMPLETED: path, predictions, per-candidate checks, evidence
@@ -100,7 +109,7 @@ sequenceDiagram
 
 #### Data retrieval
 
-- The CP agent retrieves topology, traffic, and latency data from CT's MCP server.
+- The CP agent retrieves topology, link-capacity, utilization, and service-traffic data from CT's MCP server.
 - If CT's master agent performs discovery first, it passes the snapshot ID to the CP agent. The CP agent must use that same snapshot.
 - Agree how the MCP server provides a consistent snapshot across data sources. If it cannot, record the source timestamps and limitations.
 - The CP agent must not produce a recommendation when required inputs are missing or too inconsistent to support the requested checks.
@@ -113,7 +122,7 @@ The validation result includes:
 
 - `PASS`, `FAIL`, or `INCONCLUSIVE`
 - The validation method and digital-twin state used
-- Predicted latency, available-bandwidth, and reachability checks
+- Predicted per-link utilization after the move, bandwidth headroom, and reachability checks
 - Evidence linked to the task, candidate path, and constraints
 
 The master may call a recommendation validated only when the result is `PASS` and its evidence matches the planning result. Otherwise, it reports the recommendation as computed but not validated.
@@ -128,7 +137,7 @@ CT's existing model (slide *Task Model / Evidence Model in Configuration Generat
 
 ### Carry a versioned network contract in A2A
 
-Use a versioned planning request/result contract carried in standard A2A 1.0 message data parts and result artifacts. This hackathon does not define or negotiate an A2A protocol extension. Agree the application contract identifier, supported versions, required fields, and unsupported-version behavior before testing. The JSON examples below identify that contract through `contract: "latency-planning/v1"` inside the application data.
+Use a versioned planning request/result contract carried in standard A2A 1.0 message data parts and result artifacts. This hackathon does not define or negotiate an A2A protocol extension. Agree the application contract identifier, supported versions, required fields, and unsupported-version behavior before testing. The JSON examples below identify that contract through `contract: "bandwidth-planning/v1"` inside the application data.
 
 Before integration, express the application request and result contract as versioned JSON Schema, with required fields, units, error outcomes, and unsupported-version behavior. Pair it with an approved input fixture and expected results, including a no-feasible-path case. Schema validation checks structure; semantic checks still require documented definitions and fixture evidence. These are preparation deliverables, not artifacts already supplied by this document.
 
@@ -140,9 +149,9 @@ The useful finding is which network semantics required an additional agreement, 
 | --- | --- | --- | --- |
 | Identity | `Task_id` | Core: task ID, context ID | Map CT’s ID to the specialist’s server-assigned A2A task ID; evidence cites both. Context ID groups interactions and is not a task ID |
 | Kind of task | `Type` | Agent Card advertises skills; request data identifies our operation | Skill and operation mapping; the card alone does not select a per-request operation |
-| Objective | `Goal` | Core: message text or structured data part; objective semantics are application-defined | A structured objective, and what "latency" means (measured or propagation, one-way or round trip, window) |
+| Objective | `Goal` | Core: message text or structured data part; objective semantics are application-defined | A structured objective: minimize predicted maximum link utilization after the move; agree utilization direction, window, and aggregation |
 | Network scope | `Target`, `Device` | Application contract in a data part; content not defined by A2A | How nodes, links, and endpoints are named on both sides, for example [RFC 8345](https://www.rfc-editor.org/info/rfc8345) IDs |
-| Constraints | Inside `Goal`? | Application contract in a data part | Latency, bandwidth, and reachability, with units |
+| Constraints | Inside `Goal`? | Application contract in a data part | Service bandwidth, maximum link utilization after the move, and reachability, with units and direction |
 | Authority | `Mode` | Application contract; permissions enforced by platform/tool access controls | How read-only is stated, and who enforces it |
 | Time validity | `Window` | Application contract in a data part | Task validity or data measurement window? |
 | Input data | Not present | Application contract in a data part | Which snapshot to use |
@@ -189,7 +198,7 @@ The fields combine R-6 (provenance, confidence, trace context, verification) wit
 | Scope | CE-A to CE-B; candidates P1, P2, P3 | P3 |
 | Inputs | Snapshot IDs retrieved over MCP | Compatible twin state ID, same candidate and constraints; explain any state differences |
 | Operation reference | Engine operation, parameters, run ID | Simulation ID |
-| Result | Per-candidate latency and bandwidth checks, including why P2 fails | Simulated/predicted latency, available-bandwidth, and reachability checks for core; fresh probe measurements only if the stretch execution runs |
+| Result | Per-candidate load and bandwidth checks, including why P2 is feasible but P3 is preferred under the fixture | Simulated/predicted per-link utilization after the move, bandwidth headroom, and reachability checks for core; fresh probe measurements only if the stretch execution runs |
 | Verification | Engine-backed prediction with traceable output; not independently validated | PASS, FAIL, or INCONCLUSIVE, with method and checks performed |
 | Limitations | Model prediction and assumptions | Twin/model validation; record shared assumptions and limits of independence |
 | Access | Reference to full engine output, and who may read it | Reference to full simulation output |
@@ -198,7 +207,7 @@ Also agree: whether evidence travels in a separate A2A artifact, within the resu
 
 ### Illustrative A2A request and result
 
-These are illustrative A2A 1.0 HTTP+JSON message bodies, not captured traffic or a complete application schema. The request uses `POST /message:send`, `Content-Type: application/a2a+json`, and `A2A-Version: 1.0`. Other A2A bindings have different envelopes. Fields inside each `data` object belong to our proposed planning contract, not the A2A core specification. The 10 Gbit/s requirement and other fixture values below are examples to agree with CT.
+These are illustrative A2A 1.0 HTTP+JSON message bodies, not captured traffic or a complete application schema. The request uses `POST /message:send`, `Content-Type: application/a2a+json`, and `A2A-Version: 1.0`. Other A2A bindings have different envelopes. Fields inside each `data` object belong to our proposed planning contract, not the A2A core specification. The 20 Gbit/s service move and 80% utilization ceiling below are proposed fixture assumptions, not values provided by the screenshot; agree them with CT.
 
 The first request omits `taskId`: the specialist assigns its A2A task ID. `ctTaskId` preserves the master's correlation ID.
 
@@ -207,71 +216,150 @@ The first request omits `taskId`: the specialist assigns its A2A task ID. `ctTas
   "message": {
     "messageId": "msg-plan-001",
     "role": "ROLE_USER",
-    "parts": [{
-      "data": {
-        "contract": "latency-planning/v1",
-        "ctTaskId": "CT-001",
-        "operation": "propose-path",
-        "endpoints": {"source": "CE-A", "destination": "CE-B"},
-        "objective": {"metric": "one-way-latency", "maximum": 20, "unit": "ms"},
-        "constraints": {
-          "minimumAvailableBandwidth": {"value": 10, "unit": "Gbit/s"},
-          "preserveVpnReachability": true
-        },
-        "input": {
-          "snapshotId": "twin-snapshot-001",
-          "windowStart": "2026-10-22T10:00:00Z",
-          "windowEnd": "2026-10-22T10:05:00Z"
-        },
-        "authority": "recommendation-only",
-        "requiredEvidence": ["input-references", "engine-run", "candidate-checks"]
+    "parts": [
+      {
+        "data": {
+          "contract": "bandwidth-planning/v1",
+          "ctTaskId": "CT-001",
+          "operation": "propose-path",
+          "endpoints": {
+            "source": "CE-A",
+            "destination": "CE-B"
+          },
+          "objective": {
+            "metric": "maximum-link-utilization-after-move",
+            "optimization": "minimize",
+            "unit": "percent"
+          },
+          "constraints": {
+            "maximumLinkUtilizationAfterMove": {
+              "value": 80,
+              "unit": "percent"
+            },
+            "preserveVpnReachability": true
+          },
+          "input": {
+            "snapshotId": "twin-snapshot-001",
+            "windowStart": "2026-10-22T10:00:00Z",
+            "windowEnd": "2026-10-22T10:05:00Z"
+          },
+          "authority": "recommendation-only",
+          "requiredEvidence": [
+            "input-references",
+            "engine-run",
+            "candidate-checks"
+          ],
+          "trafficMove": {
+            "sourcePathId": "P1",
+            "serviceBandwidth": {
+              "value": 20,
+              "unit": "Gbit/s"
+            },
+            "includedInSourceLoad": true,
+            "direction": "CE-A-to-CE-B"
+          }
+        }
       }
-    }]
+    ]
   }
 }
 ```
 
-An illustrative final response follows. Its available bandwidth and reachability values are assumed fixture outputs, not measured facts. The engine evidence supports a computed result; validation is still pending. A real implementation must retain accessible engine inputs and outputs and define authentication, evidence access, error outcomes, and schema validation.
+An illustrative final response follows. Its predicted utilization, headroom, and reachability values are assumed fixture outputs, not measured facts. The engine evidence supports a computed result; validation is still pending. A real implementation must retain accessible engine inputs and outputs and define authentication, evidence access, error outcomes, and schema validation.
 
 ```json
 {
   "task": {
     "id": "cp-task-001",
     "contextId": "context-001",
-    "status": {"state": "TASK_STATE_COMPLETED"},
-    "artifacts": [{
-      "artifactId": "planning-result-001",
-      "parts": [{
-        "data": {
-          "contract": "latency-planning/v1",
-          "ctTaskId": "CT-001",
-          "outcome": "feasible",
-          "candidateId": "P3",
-          "path": ["CE-A", "PE-A", "E3-A", "I3-B", "PE-B", "CE-B"],
-          "checks": {
-            "predictedOneWayLatency": {"value": 12, "maximum": 20, "unit": "ms", "pass": true},
-            "availableBandwidth": {"value": 15, "minimum": 10, "unit": "Gbit/s", "pass": true},
-            "vpnReachability": {"predicted": true, "pass": true}
-          },
-          "rejectedCandidates": [{
-            "candidateId": "P2",
-            "reason": "latency-exceeds-maximum",
-            "predictedOneWayLatency": {"value": 25, "unit": "ms"}
-          }],
-          "evidence": {
-            "a2aTaskId": "cp-task-001",
-            "ctTaskId": "CT-001",
-            "snapshotId": "twin-snapshot-001",
-            "engineRunId": "engine-run-001",
-            "operation": "constrained-path-computation",
-            "parametersRef": "evidence://engine-run-001/parameters",
-            "outputRef": "evidence://engine-run-001/output",
-            "runTime": "2026-10-22T10:06:00Z"
-          },
-          "validation": {"status": "pending"}
-        }
-      }]
-    }]
+    "status": {
+      "state": "TASK_STATE_COMPLETED"
+    },
+    "artifacts": [
+      {
+        "artifactId": "planning-result-001",
+        "parts": [
+          {
+            "data": {
+              "contract": "bandwidth-planning/v1",
+              "ctTaskId": "CT-001",
+              "outcome": "feasible",
+              "candidateId": "P3",
+              "path": [
+                "CE-A",
+                "PE-A",
+                "E3",
+                "I3",
+                "PE-B",
+                "CE-B"
+              ],
+              "checks": {
+                "destinationMaximumLinkUtilizationAfterMove": {
+                  "value": 50,
+                  "maximum": 80,
+                  "unit": "percent",
+                  "pass": true
+                },
+                "sourceMaximumLinkUtilizationAfterMove": {
+                  "value": 72,
+                  "maximum": 80,
+                  "unit": "percent",
+                  "pass": true
+                },
+                "destinationPolicyHeadroomBeforeMove": {
+                  "value": 50,
+                  "minimum": 20,
+                  "unit": "Gbit/s",
+                  "pass": true
+                },
+                "destinationUnusedCapacityAfterMove": {
+                  "value": 50,
+                  "unit": "Gbit/s"
+                },
+                "vpnReachability": {
+                  "predicted": true,
+                  "pass": true
+                }
+              },
+              "evidence": {
+                "a2aTaskId": "cp-task-001",
+                "ctTaskId": "CT-001",
+                "snapshotId": "twin-snapshot-001",
+                "engineRunId": "engine-run-001",
+                "operation": "constrained-path-computation",
+                "parametersRef": "evidence://engine-run-001/parameters",
+                "outputRef": "evidence://engine-run-001/output",
+                "runTime": "2026-10-22T10:06:00Z"
+              },
+              "validation": {
+                "status": "pending"
+              },
+              "otherCandidates": [
+                {
+                  "candidateId": "P2",
+                  "feasible": true,
+                  "selected": false,
+                  "reason": "higher-utilization-after-move",
+                  "predictedMaximumLinkUtilizationAfterMove": {
+                    "value": 75,
+                    "unit": "percent"
+                  }
+                },
+                {
+                  "candidateId": "P1",
+                  "feasible": false,
+                  "reason": "keeping-current-path-exceeds-utilization-ceiling",
+                  "predictedMaximumLinkUtilization": {
+                    "value": 92,
+                    "unit": "percent"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -313,7 +401,7 @@ Tag every finding as **organic** (found during negotiation or integration, witho
 | Core | One A2A delegation with MCP data retrieval; the task fields and status mapping exercised; one combined evidence view; a validated recommendation presented for review |
 | Core checks | "Completed, but not validated"; investigate and document one organic mismatch from integration, with a corrected rerun if one is found. Finding no mismatch is a valid result; do not manufacture one. |
 | Core deliverable | The negotiation log, the filled-in tables, the versioned request/result contract, a reproducible exchange, the core checks, and a short gap report that leads with organic findings and scores the expected findings |
-| Stretch | Prioritize an independent client constructing the task and checking its evidence; then additional failure cases (unfinished task, injected capacity mismatch, broken evidence); apply P3 in the digital twin and re-measure; a latency-definition mismatch; a changed snapshot that requires revalidation |
+| Stretch | Prioritize an independent client constructing the task and checking its evidence; then additional failure cases (unfinished task, injected capacity mismatch, broken evidence); apply P3 in the digital twin and re-measure; a utilization-definition mismatch (percentage versus fraction, or mismatched measurement windows); a changed snapshot that requires revalidation |
 | Deferred | Agent registration and lifecycle, intervention and recovery, live ingestion, production authorization tests, and any live network change |
 
 The CP agent has recommendation-only authority from the start. Use CT's existing master; do not build a new orchestrator. Check the known result without claiming to benchmark the engine.
@@ -334,11 +422,12 @@ A completed status alone is insufficient. The master shows "computed" until vali
 
 The checks below define the initial pass conditions; a fuller `Test-plan.md` is planned. The successful baseline and "completed, but not validated" are core. Investigate organic mismatches during integration; the remaining injected failures are stretch work. An intentionally triggered failure demonstrates a checker, not an independently discovered interoperability gap.
 
+- **Bandwidth-aware baseline.** With the approved proposed fixture, recommend P3 at 50% predicted destination utilization and report P1 at 72%. Report P2 at 75% as feasible but not preferred. Verify all affected links and reachability; these summary values alone do not validate the whole path.
 - **Completed, but not validated.** The CP agent returns `COMPLETED`, then CT's validation agent returns FAIL. The master must not present a validated path.
 - **Stretch: same word, different meaning in status.** Run a task the CP agent cannot finish and record the A2A state and the CT status on each side.
-- **Stretch: a valid message with the wrong meaning.** The MCP data puts P3's total capacity (100G) where the CP agent expects available bandwidth. The message is schema-valid but P3 looks roomier than it is. Compare the source-field mapping and metric metadata against the approved fixture, make the mapping explicit, and rerun. A schema-valid number alone cannot reveal this substitution. Record whether detection came from an automated semantic check, fixture comparison, or human review; do not claim automatic detection without such a check.
+- **Stretch: a valid message with the wrong meaning.** The MCP data puts P3's total capacity (100 Gbit/s) where the CP agent expects policy headroom (50 Gbit/s before the proposed move). The message is schema-valid but P3 looks roomier than it is. Compare the source-field mapping and metric metadata against the approved fixture, make the mapping explicit, and rerun. A schema-valid number alone cannot reveal this substitution. Record whether detection came from an automated semantic check, fixture comparison, or human review; do not claim automatic detection without such a check.
 - **Stretch: broken evidence.** Alter one reference, such as a snapshot ID that does not match the task. The master flags the result as unverified.
-- **Stretch: apply the path in the digital twin.** A controller function in the twin applies P3 and the twin re-measures latency. Acceptance, execution, and the fresh measurement are reported separately. This is the only test that reaches the v2 deck's agent-to-controller example.
+- **Stretch: apply the path in the digital twin.** A controller function in the twin applies P3 and the twin re-measures per-link utilization, service throughput, and reachability. Acceptance, execution, and the fresh measurement are reported separately. This is the only test that reaches the v2 deck's agent-to-controller example.
 
 A deliberately incomplete contract does not establish a defect in A2A or MCP. Record whether existing models or the versioned application contract resolve each mismatch, or whether a further agreement was needed.
 
@@ -352,13 +441,13 @@ A deliberately incomplete contract does not establish a defect in A2A or MCP. Re
 6. Which logging system both sides use to correlate the exchange.
 7. Whether CT’s validation agent independently checks correctness, what method it uses, which assumptions it shares with the planning engine, and whether an additional reviewed expected outcome is needed.
 8. Whether the master performs initial MCP discovery as shown in the demo screenshot, and how its snapshot is pinned for the CP agent’s retrieval.
-9. The exact baseline bandwidth, reachability and latency definitions, and the chosen application contract version.
+9. The service bandwidth to move, utilization ceiling, measurement definitions, full P2 route and shared links, reachability assumptions, and application contract version.
 
-Reconcile all whiteboard latency labels with the approved baseline fixture. The board’s handwritten flow has the CP agent initiating MCP, while the demo screenshot also shows master-to-MCP discovery. Clarify the two roles and use the same snapshot reference; do not infer that two independent reads return consistent state.
+Replace the old whiteboard latency labels with the supplied utilization/capacity values and reconcile them with the approved bandwidth fixture. The board’s handwritten flow has the CP agent initiating MCP, while the demo screenshot also shows master-to-MCP discovery. Clarify the two roles and use the same snapshot reference; do not infer that two independent reads return consistent state.
 
 ## Production freshness and pre-execution checks
 
-For operational latency optimization, inputs must be fresh enough for the decision, typically using near-real-time topology, availability, delay, and traffic from the operator platform. The specialist can consume a consistent snapshot when tasked rather than maintain its own telemetry feed. Agree maximum input age, measurement windows, source alignment, validity conditions, and changes that invalidate a result. Long-term capacity forecasting also needs representative history and growth assumptions. These production requirements do not expand the first event beyond its prepared snapshot.
+For operational bandwidth-aware path selection, inputs must be fresh enough for the decision, typically using near-real-time topology, availability, link capacity, utilization, and service traffic from the operator platform. The specialist can consume a consistent snapshot when tasked rather than maintain its own telemetry feed. Agree maximum input age, measurement windows, source alignment, validity conditions, and changes that invalidate a result. Long-term capacity forecasting also needs representative history and growth assumptions. These production requirements do not expand the first event beyond its prepared snapshot.
 
 Before applying an approved plan, a separate authorized executor checks current conditions and permissions. If the plan would now cause congestion or violate constraints, pause and request replanning through a linked new task. If another path is merely better while the approved path remains valid, operator policy determines whether to proceed or optimize again; use thresholds and a replanning budget to avoid oscillation. Materially revised plans require authorization as appropriate. Current-state checks alone do not prevent concurrent resource changes; controller-supported admission or reservation mechanisms may be needed. After execution, assurance measures the outcome and coordinates authorized recovery when necessary; rollback is not automatically safe.
 
