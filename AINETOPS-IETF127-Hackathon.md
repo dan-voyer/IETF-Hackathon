@@ -70,7 +70,7 @@ flowchart TD
     C2 --- D
 ```
 
-This replaces the earlier illustrative 100G P1/P2/P3 scenario. The values below come from the supplied screenshots and the running Crosswork Planning AI Agent session. They are simulation results for this model, not measurements from a live network.
+This replaces the earlier illustrative 100G P1/P2/P3 scenario. The values below come from the supplied screenshots and the running Capacity Planning AI Agent session. They are simulation results for this model, not measurements from a live network.
 
 #### 1. Establish a healthy baseline
 
