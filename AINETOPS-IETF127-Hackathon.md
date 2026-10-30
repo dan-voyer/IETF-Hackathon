@@ -60,9 +60,7 @@ The working assumption is CT's platform in CT Cloud and the Cisco container on A
 
 The demo starts with a small IPv6 planning model: six nodes, six circuits, twelve interfaces, one traffic demand named `A_to_D`, and two existing Segment Routing LSPs, `Tunnel100` and `Tunnel200`. Every interface has a configured capacity of **1,000 Mbps**. The two branches are A → B1 → C1 → D and A → B2 → C2 → D.
 
-This replaces the earlier illustrative 100G P1/P2/P3 scenario. The values below come from the supplied screenshots and the running Capacity Planning AI Agent session. They are simulation results for this model, not measurements from a live network.
-
-**Reading the diagrams:** every link has **1,000 Mbps capacity**. Arrows show A-to-D traffic direction; percentages reproduce the simulation's reported forward-interface utilization. Gray links have no utilization value listed in the supplied baseline summary; they do not mean zero traffic or a failed path. The topology and node positions stay the same in all three drawings.
+**Reading the diagrams:** each interface in this lab model is configured with **1,000 Mbps (1 Gbit/s) capacity**. Arrows show A-to-D traffic direction; percentages reproduce the simulation's reported forward-interface utilization. Gray links have no utilization value listed in the baseline simulation summary; they do not mean zero traffic or a failed path. The topology and node positions stay the same in all three drawings.
 
 #### 1. Establish a healthy baseline
 
@@ -147,7 +145,7 @@ The detailed LSP report identifies the changes as follows. These are the UI's se
 
 #### 4. Re-simulate and show the outcome
 
-The final simulation reports **60% maximum utilization**, below the requested 70% target. All six forward interfaces across the two branches show 60% utilization. The report demonstrates a balanced modeled load while retaining the 1,200 Mbps demand; per-branch throughput is not separately reported in the supplied summary. No interfaces remain above 100% or above the report's 80% critical threshold, and network health changes from **Critical** to **Optimal**.
+The final simulation reports **60% maximum utilization**, below the requested 70% target. All six forward interfaces across the two branches show 60% utilization. The report demonstrates a balanced modeled load while retaining the 1,200 Mbps demand; per-branch throughput is not separately reported in the simulation summary. No interfaces remain above 100% or above the report's 80% critical threshold, and network health changes from **Critical** to **Optimal**.
 
 #### Diagram 3 — Traffic balanced after optimization
 
@@ -455,10 +453,10 @@ A deliberately incomplete contract does not establish a defect in A2A or MCP. Re
 5. How the CP agent reaches its LLM (direct or through a proxy).
 6. Which logging system both sides use to correlate the exchange.
 7. Whether CT’s validation agent independently checks correctness, what method it uses, which assumptions it shares with the planning engine, and whether an additional reviewed expected outcome is needed.
-8. Whether the master performs initial MCP discovery as shown in the demo screenshot, and how its snapshot is pinned for the CP agent’s retrieval.
+8. Whether the master performs initial MCP discovery, and how its snapshot is pinned for the CP agent’s retrieval.
 9. The mapping of the six-node lab into CT’s model, demand units, 70% target semantics, SR-TE weights and expanded routes, reachability checks, and application contract version.
 
-Replace the earlier 100G P1/P2/P3 illustration and 20 Gbit/s / 80% assumptions with the six-node lab: 1,000 Mbps interfaces, 300 → 1,200 Mbps demand, a 70% target, and 60% optimized utilization. The board’s handwritten flow has the CP agent initiating MCP, while the demo screenshot also shows master-to-MCP discovery. Clarify the two roles and use the same snapshot reference; do not infer that two independent reads return consistent state.
+Agree which MCP discovery steps are performed by the master and which by the CP agent. Both must use the same pinned snapshot reference; two independent reads do not necessarily return consistent state.
 
 ## Production freshness and pre-execution checks
 
