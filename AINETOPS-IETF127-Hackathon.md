@@ -111,7 +111,7 @@ The final simulation reports **60% maximum utilization**, below the requested 70
 
 The demo ends with the before/after comparison and LSP change details. **70% is the requested target; 60% is the achieved simulation result.** The change from 120% to 60% is a reduction of 60 percentage points, or 50% relative to the baseline. The UI's “Optimal” label is a reported health classification, not proof of a globally optimal solution.
 
-Retain the demand values, model revisions, engine operations, LSP changes, and both simulation reports as evidence. The observed overloaded baseline report is `pg1793387263093.txt`, and the optimized report is `pg1793387332689.txt`; future runs will produce their own references. The display's segment-list notation is not a complete physical hop trace, so retain expanded routes and weights if required for validation.
+Retain the demand values, model versions, LSP changes, and before-and-after simulation results as evidence. The results should show that the 1,200 Mbps demand remains unchanged while maximum interface utilization falls from 120% to 60%, below the requested 70% target. Include the detailed routes and traffic-distribution weights where needed to explain and validate the improvement.
 
 #### How this becomes the multi-agent hackathon experiment
 
