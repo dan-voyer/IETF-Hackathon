@@ -95,7 +95,7 @@ flowchart LR
     style RUN fill:#ffffff,stroke:#bfdbfe,stroke-width:2px,color:#0f172a
 ```
 
-*The first simulation establishes a healthy baseline: three forward interfaces on the upper branch report 30% utilization.*
+*The first simulation establishes a healthy baseline: three forward interfaces on A → B1 → C1 → D report 30% utilization.*
 
 #### 2. Increase demand and expose the bottleneck
 
