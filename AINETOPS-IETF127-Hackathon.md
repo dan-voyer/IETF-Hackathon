@@ -62,6 +62,28 @@ The demo starts with a small IPv6 planning model: six nodes, six circuits, twelv
 
 This replaces the earlier illustrative 100G P1/P2/P3 scenario. The values below come from the supplied screenshots and the running Capacity Planning AI Agent session. They are simulation results for this model, not measurements from a live network.
 
+#### Diagram 1 — Initial lab topology
+
+**Six nodes · Six circuits · Twelve interfaces · Two existing SR LSPs · All interfaces: 1,000 Mbps**
+
+```mermaid
+flowchart LR
+    A(["A · source"]) --- B1("B1")
+    B1 --- C1("C1")
+    C1 --- D(["D · destination"])
+    A --- B2("B2")
+    B2 --- C2("C2")
+    C2 --- D
+
+    classDef endpoint fill:#0f172a,stroke:#334155,color:#ffffff,stroke-width:2px
+    classDef router fill:#f1f5f9,stroke:#64748b,color:#0f172a,stroke-width:2px
+    class A,D endpoint
+    class B1,B2,C1,C2 router
+    linkStyle 0,1,2,3,4,5 stroke:#64748b,stroke-width:3px
+```
+
+*The starting topology, before changing demand or running the demo simulations. The single demand, A_to_D, connects A to D. Utilization is intentionally omitted here; the subsequent simulation results establish the load on each branch.*
+
 #### 1. Establish a healthy baseline
 
 After loading the lab plan, the operator asks: **“change demand A_to_D traffic to 300”**, then **“list demand”**. The agent confirms that demand A_to_D runs from A to D at **300 Mbps**. Listing the demand makes the input visible before evaluating the network.
@@ -76,7 +98,7 @@ The simulation completes successfully, but reports the network as **Critical**: 
 
 This is the first important distinction in the demo: **a successful simulation task can report an unhealthy network**. Task success describes whether the analysis ran; the result describes whether the network meets its requirements.
 
-#### Before optimization — overloaded model
+#### Diagram 2 — Before optimization: overloaded model
 
 **Demand: 1,200 Mbps · Interface capacity: 1,000 Mbps · Maximum utilization: 120% · Health: Critical**
 
@@ -118,7 +140,7 @@ The detailed LSP report identifies the changes as follows. These are the UI's se
 
 The final simulation reports **60% maximum utilization**, below the requested 70% target. All six forward interfaces across the two branches show 60% utilization. The report demonstrates a balanced modeled load while retaining the 1,200 Mbps demand; per-branch throughput is not separately reported in the supplied summary. No interfaces remain above 100% or above the report's 80% critical threshold, and network health changes from **Critical** to **Optimal**.
 
-#### After optimization — target met in simulation
+#### Diagram 3 — After optimization: target met in simulation
 
 **Demand: 1,200 Mbps, unchanged · Interface capacity: 1,000 Mbps, unchanged · Target: 70% · Achieved maximum: 60% · Health: Optimal**
 
