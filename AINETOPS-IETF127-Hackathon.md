@@ -2,19 +2,19 @@
 
 ## In brief
 
-This is a plan for a day-and-a-half experiment at the Internet Engineering Task Force (IETF) 127 hackathon. China Telecom (CT) and Cisco will test whether their independently developed agents can work together on a network-planning task. CT's master agent asks a Cisco-built capacity-planning agent (the "CP agent") to find a network path with more bandwidth headroom. The master agent sends the request using Agent2Agent (A2A). The CP agent reads network information from CT's digital twin using the Model Context Protocol (MCP), runs a planning engine, and returns a recommendation with evidence.
+This is a plan for a day-and-a-half experiment at the Internet Engineering Task Force (IETF) 127 hackathon. China Telecom (CT) and Cisco will test whether their independently developed agents can work together on a network-planning task. CT's master agent asks a Cisco-built capacity-planning agent (the "CP agent") to produce an SR-TE plan that lowers maximum interface utilization while preserving the offered demand. The master agent sends the request using Agent2Agent (A2A). The CP agent reads network information from CT's digital twin using the Model Context Protocol (MCP), runs a planning engine, and returns a recommendation with evidence.
 
 The experiment tests whether both implementations understand the task, its status, and its supporting evidence the same way. It records what CT and Cisco still need to agree on beyond A2A and MCP. The findings can inform AINETOPS and related standards discussions without presuming that a new protocol, profile, or working group is needed. Existing specifications proving sufficient is a valid outcome.
 
 ## What happens during the hackathon
 
-1. **Agree on the test.** CT and Cisco pin a digital-twin snapshot and define the request: find a path that meets the agreed bandwidth, utilization, and reachability requirements.
+1. **Agree on the test.** CT and Cisco pin a digital-twin snapshot and define the request: optimize the 1,200 Mbps A_to_D demand toward a 70% maximum interface-utilization target without reducing demand or capacity.
 2. **Delegate the task.** CT's master agent sends the request to the CP agent over A2A.
-3. **Compute a recommendation.** The CP agent retrieves the agreed network data through MCP, runs the planning engine, and returns its recommended path and evidence.
-4. **Check the recommendation.** CT's validation agent checks the candidate against the digital twin and reports PASS, FAIL, or INCONCLUSIVE.
-5. **Report what the evidence supports.** The master presents a path as validated only when the evidence matches and validation passes. Otherwise, it reports that the path was computed but not validated.
+3. **Compute a recommendation.** The CP agent retrieves the agreed network data through MCP, runs the planning engine, and returns its proposed SR-TE changes, before/after simulation results, and evidence.
+4. **Check the recommendation.** CT's validation agent checks the proposed SR-TE plan against a compatible model state and reports PASS, FAIL, or INCONCLUSIVE.
+5. **Report what the evidence supports.** The master presents the plan as validated only when the evidence matches and validation passes. Otherwise, it reports that the plan was computed and re-simulated but not independently validated.
 
-For this experiment, CT provides an emulated test network. The experiment's main output is a record of what the two implementations could understand from the protocols and agreed contract, what needed further agreement, and what remains unresolved.
+The local demo uses an isolated planning model. The multi-agent integration will agree how CT supplies a compatible model snapshot and validates the proposed changes. The experiment's main output is a record of what the two implementations could understand from the protocols and agreed contract, what needed further agreement, and what remains unresolved.
 
 ## The problem it tests
 
@@ -37,7 +37,7 @@ CT and Cisco built their agents independently. CT already has its own task and e
 | B. Task and evidence profile, agent-to-controller | Only through the stretch goal. The deck's main example sits at this boundary. |
 | A. Agent operational lifecycle | No. Agent registration is bypassed. |
 | Intervention and recovery (with ICON) | No |
-| Risk classification | Only as the task's read-only mode. The v2 deck drops a universal R0–R5 scale as an initial requirement. |
+| Risk classification | Only as recommendation-only authority toward the network; isolated planning-model changes are allowed. The v2 deck drops a universal R0–R5 scale as an initial requirement. |
 
 The hackathon tests the real problem, but only its agent-to-agent half. The gap report must say what was not covered.
 
@@ -48,38 +48,76 @@ The hackathon tests the real problem, but only its agent-to-agent half. The gap 
 | Component | Provided by | Role |
 | --- | --- | --- |
 | Master agent | CT | Delegates the task over A2A, presents the result |
-| Validation agent | CT | Checks the recommended path in the digital twin |
+| Validation agent | CT | Checks the proposed SR-TE changes and their supporting simulation evidence |
 | MCP server | CT | Read-only topology, telemetry, and link performance from the digital twin |
 | Digital twin (emulator) | CT | Emulates the test network. No live network is touched. |
 | CP agent, MCP client and data adapter | Cisco, one Docker container | Accepts the task, fetches data, builds the engine input, returns the result and evidence |
-| Planning engine | Cisco | Computes candidate paths using traffic demand, link capacity, and predicted utilization. Confirm its APIs first. |
+| Planning engine | Cisco | Optimizes SR-TE paths and weights in an isolated model, then re-simulates utilization. Confirm its APIs first. |
 
 The working assumption is CT's platform in CT Cloud and the Cisco container on AWS, over public IPs. CT initiates A2A; the CP agent initiates MCP. An alternative, still to be agreed, is CT's master and digital twin in a Cisco lab over VPN. Run the full exchange end to end before the event.
 
-### The scenario: bandwidth-aware path planning
+### The scenario: from an overloaded path to a balanced SR-TE plan
 
-CE-A in domain A connects to CE-B in domain B. The supplied use-case diagram shows the following utilization and nominal capacity values. CT's platform supplies the topology and traffic snapshot used to interpret them.
+The demo starts with a small IPv6 planning model: six nodes, six circuits, twelve interfaces, one traffic demand named `A_to_D`, and two existing Segment Routing LSPs, `Tunnel100` and `Tunnel200`. Every interface has a configured capacity of **1,000 Mbps**. There are two branches between A and D:
 
-| Path | Role and route shown | Utilization | Nominal capacity | Illustrative unused capacity |
+```mermaid
+flowchart TD
+    A["A"] --- B1["B1"]
+    A --- B2["B2"]
+    B1 --- C1["C1"]
+    B2 --- C2["C2"]
+    C1 --- D["D"]
+    C2 --- D
+```
+
+This replaces the earlier illustrative 100G P1/P2/P3 scenario. The values below come from the supplied screenshots and the running Crosswork Planning AI Agent session. They are simulation results for this model, not measurements from a live network.
+
+#### 1. Establish a healthy baseline
+
+After loading the lab plan, the operator asks: **“change demand A_to_D traffic to 300”**, then **“list demand”**. The agent confirms that demand A_to_D runs from A to D at **300 Mbps**. Listing the demand makes the input visible before evaluating the network.
+
+The operator then asks: **“run simulation”**. The simulation reports **Optimal** network health and a maximum interface utilization of **30%**. The three loaded forward interfaces—A/GigabitEthernet1, B1/GigabitEthernet2, and C1/GigabitEthernet2—each show 30% utilization, consistent with 300 Mbps using the A → B1 → C1 → D branch.
+
+#### 2. Increase demand and expose the bottleneck
+
+Next, the operator asks: **“change demand A_to_D traffic to 1200”**, then runs the simulation again. The demand is now **1,200 Mbps**, while each interface still has only 1,000 Mbps of capacity.
+
+The simulation completes successfully, but reports the network as **Critical**: maximum utilization is **120%**, with three interfaces above 100%. The overloaded interfaces are the same three on the first branch. Here, 120% represents modeled offered load relative to capacity; it does not mean that a physical 1,000 Mbps interface is forwarding 1,200 Mbps.
+
+This is the first important distinction in the demo: **a successful simulation task can report an unhealthy network**. Task success describes whether the analysis ran; the result describes whether the network meets its requirements.
+
+#### 3. Ask for a better plan
+
+The operator asks: **“lower utilization to 70% with details”**. The agent presents a four-step plan for approval: run a baseline simulation, optimize SR-TE bandwidth, re-run the simulation, and retrieve the resulting summary and detailed change report. As in the preceding steps, the operator approves the planned tasks before execution.
+
+The optimizer works on the planning model. It does not reduce the traffic demand or change interface capacity. The detailed report shows **two existing LSPs rerouted**, **two new weighted segment lists**, **no new LSPs**, and **no modified demands**. It also reports zero latency-bound violations; that counter alone does not establish a latency guarantee, especially where no bound is configured.
+
+The detailed LSP report identifies the changes as follows. These are the UI's segment-list summaries, not expanded physical hop lists.
+
+| LSP | Before route information | After segment-list summary |
+| --- | --- | --- |
+| Tunnel100 | B1 → C1 → D | `SL (1.0): D` |
+| Tunnel200 | B1 → C1 → D | `SL[1] (1.0): B2 → D` |
+
+#### 4. Re-simulate and show the outcome
+
+The final simulation reports **60% maximum utilization**, below the requested 70% target. All six forward interfaces across the two branches show 60% utilization, consistent with distributing the unchanged 1,200 Mbps demand as approximately 600 Mbps on each branch. No interfaces remain above 100% or above the report's 80% critical threshold, and network health changes from **Critical** to **Optimal**.
+
+| Stage | Demand A_to_D | Maximum utilization | Interfaces above 100% | Reported health |
 | --- | --- | --- | --- | --- |
-| P1 | Primary, via PE-A → E1 → I1 → PE-B | 92% | 100 Gbit/s | 8 Gbit/s |
-| P2 | Backup; exact link sequence to confirm | 55% | 100 Gbit/s | 45 Gbit/s |
-| P3 | Candidate, via PE-A → E3 → I3 → PE-B | 30% | 100 Gbit/s | 70 Gbit/s |
+| Initial baseline | 300 Mbps | 30% | 0 | Optimal |
+| Increased demand, before optimization | 1,200 Mbps | 120% | 3 | Critical |
+| After SR-TE optimization and re-simulation | 1,200 Mbps | 60% | 0 | Optimal |
 
-Unused capacity here is calculated as nominal capacity × (1 − utilization). These figures are illustrative headroom estimates from the screenshot, not bandwidth reservations or proof of end-to-end available bandwidth. Confirm the utilization direction, measurement window, aggregation method, and every link on each path, including the access segments. P2's dashed line does not establish its exact route or whether it shares resources with P3.
+The demo ends with the before/after comparison and LSP change details. **70% is the requested target; 60% is the achieved simulation result.** The change from 120% to 60% is a reduction of 60 percentage points, or 50% relative to the baseline. The UI's “Optimal” label is a reported health classification, not proof of a globally optimal solution.
 
-The master asks the CP agent to recommend moving the CE-A-to-CE-B service from heavily utilized P1 to a path with more bandwidth headroom while preserving VPN reachability. The objective is to minimize the candidate path's predicted maximum link utilization after the move, subject to the agreed utilization ceiling and bandwidth requirements. Latency is not the selection objective for this first experiment.
+Retain the demand values, model revisions, engine operations, LSP changes, and both simulation reports as evidence. The observed overloaded baseline report is `pg1793387263093.txt`, and the optimized report is `pg1793387332689.txt`; future runs will produce their own references. The display's segment-list notation is not a complete physical hop trace, so retain expanded routes and weights if required for validation.
 
-**Proposed test fixture, to be approved by CT and Cisco:** move an existing 20 Gbit/s service from P1, with an 80% maximum link-utilization ceiling after the move. Neither value comes from the screenshot. Assume that P1's current load includes this service, that the candidate core paths have separate bottlenecks, and that shared/access links remain within the ceiling. Pin those assumptions in the fixture; the actual implementation must recompute every affected link, subtracting and adding the service only where its route changes.
+#### How this becomes the multi-agent hackathon experiment
 
-| Candidate move | Predicted P1 utilization | Predicted destination utilization | Destination unused capacity after move | Expected decision |
-| --- | --- | --- | --- | --- |
-| P1 → P2 | 72% | 75% | 25 Gbit/s | Feasible under the proposed fixture, but less headroom than P3 |
-| P1 → P3 | 72% | 50% | 50 Gbit/s | Preferred, subject to all link and reachability checks |
+The local lab establishes the planning workflow. The hackathon will test whether CT's master can delegate the same **1,200 Mbps demand / 70% utilization-target** task to the specialist over A2A, supply a consistent model through MCP, and interpret the returned change plan and evidence. The current local session does not itself demonstrate the CT-to-Cisco A2A/MCP integration or CT's separate validation agent.
 
-P3 is the expected recommendation because it has the lower predicted maximum link utilization under this fixture. P2 must not be reported as infeasible merely because P3 is preferred. Keeping the service on P1 leaves utilization at 92%; do not add the existing service a second time. Changed inputs may select P2 or yield no feasible alternative. Missing route or load information must produce an insufficient-input outcome rather than an invented recommendation.
-
-Define available bandwidth before approving the fixture: measured unused capacity, unreserved bandwidth, and policy-limited headroom are different quantities. For the proposed 80% ceiling, P3's policy headroom before the move is 50 Gbit/s, while its unused nominal capacity is 70 Gbit/s. Record the chosen definitions, traffic direction, measurement window, and how link values determine path feasibility in the contract or referenced snapshot metadata.
+The specialist may change an isolated planning-model copy to compute and re-simulate alternatives. Its external authority remains recommendation-only: it cannot deploy the plan to a live network. CT's validator must check the same demand, capacities, proposed SR-TE changes, and compatible model state before the master calls the recommendation validated. Changing a planning model, re-simulating it, independently validating it, and deploying it are distinct events.
 
 ```mermaid
 sequenceDiagram
@@ -88,16 +126,16 @@ sequenceDiagram
     participant P as CP agent (Cisco container)
     participant S as CT MCP server / digital twin
     participant V as CT validation agent
-    O->>M: Find a path with more bandwidth headroom between CE-A and CE-B
-    M->>P: A2A task: endpoints, objective, constraints, snapshot, read-only, evidence required
+    O->>M: Optimize A_to_D at 1200 Mbps toward 70% utilization
+    M->>P: A2A task: endpoints, objective, constraints, model revision, no live changes, evidence required
     P->>S: MCP: topology, link capacities, utilization, service traffic
     S-->>P: Data with identifiers, units, timestamps
     Note over P: Check meaning, build engine input, run engine
-    P-->>M: A2A COMPLETED: path, predictions, per-candidate checks, evidence
-    M->>V: Validate candidate in the digital twin
+    P-->>M: A2A COMPLETED: SR-TE changes, before/after simulations, evidence
+    M->>V: Validate SR-TE change plan and demand in compatible model
     V-->>M: PASS, FAIL or INCONCLUSIVE with its own evidence
     alt Evidence matches and validation passes
-        M->>O: Present validated recommendation
+        M->>O: Present validated recommendation and simulated outcome
     else Evidence missing or altered, or validation fails or is inconclusive
         M->>O: Flag as computed but not validated
         M->>P: Create linked follow-up task for correction
@@ -116,22 +154,22 @@ sequenceDiagram
 
 #### Validation
 
-CT's validation agent checks the proposed path against the agreed constraints and a compatible digital-twin state. For the core event, validation is a simulation or model check; it does not apply a configuration or measure live traffic.
+CT's validation agent checks the proposed SR-TE plan against the agreed constraints and a compatible digital-twin state. For the core event, validation checks an isolated planning model; it does not apply device configurations or measure live traffic. The specialist already modifies a working model and re-simulates it as part of computation. CT’s separate validation remains an integration task, not an observed result of the local lab.
 
 The validation result includes:
 
 - `PASS`, `FAIL`, or `INCONCLUSIVE`
 - The validation method and digital-twin state used
-- Predicted per-link utilization after the move, bandwidth headroom, and reachability checks
-- Evidence linked to the task, candidate path, and constraints
+- Predicted per-interface utilization before and after optimization, unchanged demand and capacity, and reachability checks
+- Evidence linked to the task, proposed LSP changes, model revisions, and constraints
 
 The master may call a recommendation validated only when the result is `PASS` and its evidence matches the planning result. Otherwise, it reports the recommendation as computed but not validated.
 
-Applying a path in the digital twin and measuring it afterward is stretch scope. If the event includes that work in its core validation, agree on the change before the event and update the scope accordingly. Neither simulated validation nor digital-twin measurement establishes a live-network outcome.
+Applying a configuration in an isolated device emulator and measuring traffic afterward is stretch scope. Updating and re-simulating the planning model is core computation, not device execution. If the event includes that work in its core validation, agree on the change before the event and update the scope accordingly. Neither simulated validation nor digital-twin measurement establishes a live-network outcome.
 
 ## Technical reference: task and evidence model
 
-This is the heart of the hackathon. The path computation is the vehicle; the task and evidence around it are what we test. Work out these tables with CT before the event and keep a [negotiation log](#the-negotiation-log-is-the-primary-evidence) while doing it; the event then checks that the agreed mapping works.
+This is the heart of the hackathon. The SR-TE optimization is the vehicle; the task and evidence around it are what we test. Work out these tables with CT before the event and keep a [negotiation log](#the-negotiation-log-is-the-primary-evidence) while doing it; the event then checks that the agreed mapping works.
 
 CT's existing model (slide *Task Model / Evidence Model in Configuration Generation*) has these task fields: `Task_id`, `Type`, `Goal`, `Target`, `Mode` (for example `PLAN (READ_ONLY)`), `Window`, `Current-step`, `Current-Job`, `Process_flow`, `Status`, `Exist_reason`, `Check_point`, `Device`, `Process_result`, `Output`. Its evidence is `dict(step, JSON)`, used today only in the validation stage. CT should confirm whether these fields are what its platform implements or an illustration for the configuration-generation use case. The spelling `Exist_reason` is retained from the supplied model; confirm whether the implemented field is `Exist_reason` or `Exit_reason` before finalizing the mapping.
 
@@ -149,10 +187,10 @@ The useful finding is which network semantics required an additional agreement, 
 | --- | --- | --- | --- |
 | Identity | `Task_id` | Core: task ID, context ID | Map CT’s ID to the specialist’s server-assigned A2A task ID; evidence cites both. Context ID groups interactions and is not a task ID |
 | Kind of task | `Type` | Agent Card advertises skills; request data identifies our operation | Skill and operation mapping; the card alone does not select a per-request operation |
-| Objective | `Goal` | Core: message text or structured data part; objective semantics are application-defined | A structured objective: minimize predicted maximum link utilization after the move; agree utilization direction, window, and aggregation |
+| Objective | `Goal` | Core: message text or structured data part; objective semantics are application-defined | Reduce maximum interface utilization toward 70% for the unchanged 1,200 Mbps demand; agree units, direction, and model revision |
 | Network scope | `Target`, `Device` | Application contract in a data part; content not defined by A2A | How nodes, links, and endpoints are named on both sides, for example [RFC 8345](https://www.rfc-editor.org/info/rfc8345) IDs |
-| Constraints | Inside `Goal`? | Application contract in a data part | Service bandwidth, maximum link utilization after the move, and reachability, with units and direction |
-| Authority | `Mode` | Application contract; permissions enforced by platform/tool access controls | How read-only is stated, and who enforces it |
+| Constraints | Inside `Goal`? | Application contract in a data part | Preserve the 1,200 Mbps demand, 1,000 Mbps interface capacities, and reachability; target maximum utilization of 70% |
+| Authority | `Mode` | Application contract; permissions enforced by platform/tool access controls | How isolated model edits are allowed while live-network changes are prohibited, and who enforces that boundary |
 | Time validity | `Window` | Application contract in a data part | Task validity or data measurement window? |
 | Input data | Not present | Application contract in a data part | Which snapshot to use |
 | Progress | `Process_flow`, `Current-step`, `Check_point` | Status message, history | Whether a sub-agent reports steps, and whether CT's human check points apply to it |
@@ -182,9 +220,9 @@ A completed, failed, canceled, or rejected A2A task is terminal. Correction or r
 | --- | --- | --- |
 | 1. Accepted | CP agent: `SUBMITTED` or `WORKING` | Core |
 | 2. Computed | CP agent: `COMPLETED` with result and evidence | Core |
-| 3. Validated (predicted) | CT validation agent: only PASS with matching evidence reaches this layer; FAIL or INCONCLUSIVE does not | Core |
-| 4. Applied | Controller function in the twin | Stretch |
-| 5. Verified outcome | Fresh measurement in the twin | Stretch |
+| 3. Validated (predicted) | CT validation agent: only PASS with matching evidence reaches this layer; specialist re-simulation alone does not | Core |
+| 4. Applied to devices | Controller function in an isolated emulator | Stretch; planning-model edits do not establish this layer |
+| 5. Verified device outcome | Fresh traffic measurements in the emulator | Stretch; re-simulation alone does not establish this layer |
 
 ### Evidence model
 
@@ -195,10 +233,10 @@ The fields combine R-6 (provenance, confidence, trace context, verification) wit
 | Task reference | A2A task ID and CT `Task_id` | Same IDs, plus its own step |
 | Source | CP agent's authenticated identity | Validation agent's identity |
 | Time | Snapshot collection times, run time | Validation run time and input-state time |
-| Scope | CE-A to CE-B; candidates P1, P2, P3 | P3 |
-| Inputs | Snapshot IDs retrieved over MCP | Compatible twin state ID, same candidate and constraints; explain any state differences |
+| Scope | Demand A_to_D, A to D; Tunnel100 and Tunnel200 | Same demand, affected LSPs and interfaces |
+| Inputs | Snapshot IDs retrieved over MCP | Compatible twin state ID, same proposed SR-TE changes, demand, capacities, and constraints; explain any state differences |
 | Operation reference | Engine operation, parameters, run ID | Simulation ID |
-| Result | Per-candidate load and bandwidth checks, including why P2 is feasible but P3 is preferred under the fixture | Simulated/predicted per-link utilization after the move, bandwidth headroom, and reachability checks for core; fresh probe measurements only if the stretch execution runs |
+| Result | Baseline 120% and optimized 60% maximum utilization, unchanged demand/capacity, and detailed SR-TE changes | Checks of utilization after optimization, demand preservation, capacity and reachability for core; fresh probe measurements only if the stretch execution runs |
 | Verification | Engine-backed prediction with traceable output; not independently validated | PASS, FAIL, or INCONCLUSIVE, with method and checks performed |
 | Limitations | Model prediction and assumptions | Twin/model validation; record shared assumptions and limits of independence |
 | Access | Reference to full engine output, and who may read it | Reference to full simulation output |
@@ -207,7 +245,7 @@ Also agree: whether evidence travels in a separate A2A artifact, within the resu
 
 ### Illustrative A2A request and result
 
-These are illustrative A2A 1.0 HTTP+JSON message bodies, not captured traffic or a complete application schema. The request uses `POST /message:send`, `Content-Type: application/a2a+json`, and `A2A-Version: 1.0`. Other A2A bindings have different envelopes. Fields inside each `data` object belong to our proposed planning contract, not the A2A core specification. The 20 Gbit/s service move and 80% utilization ceiling below are proposed fixture assumptions, not values provided by the screenshot; agree them with CT.
+These are illustrative A2A 1.0 HTTP+JSON message bodies, not captured traffic or a complete application schema. The request uses `POST /message:send`, `Content-Type: application/a2a+json`, and `A2A-Version: 1.0`. Other A2A bindings have different envelopes. Fields inside each `data` object belong to our proposed planning contract, not the A2A core specification. The example uses the observed lab demand of 1,200 Mbps and requested 70% target. It illustrates the proposed integration contract; it is not captured A2A traffic.
 
 The first request omits `taskId`: the specialist assigns its A2A task ID. `ctTaskId` preserves the master's correlation ID.
 
@@ -216,155 +254,59 @@ The first request omits `taskId`: the specialist assigns its A2A task ID. `ctTas
   "message": {
     "messageId": "msg-plan-001",
     "role": "ROLE_USER",
-    "parts": [
-      {
-        "data": {
-          "contract": "bandwidth-planning/v1",
-          "ctTaskId": "CT-001",
-          "operation": "propose-path",
-          "endpoints": {
-            "source": "CE-A",
-            "destination": "CE-B"
-          },
-          "objective": {
-            "metric": "maximum-link-utilization-after-move",
-            "optimization": "minimize",
-            "unit": "percent"
-          },
-          "constraints": {
-            "maximumLinkUtilizationAfterMove": {
-              "value": 80,
-              "unit": "percent"
-            },
-            "preserveVpnReachability": true
-          },
-          "input": {
-            "snapshotId": "twin-snapshot-001",
-            "windowStart": "2026-10-22T10:00:00Z",
-            "windowEnd": "2026-10-22T10:05:00Z"
-          },
-          "authority": "recommendation-only",
-          "requiredEvidence": [
-            "input-references",
-            "engine-run",
-            "candidate-checks"
-          ],
-          "trafficMove": {
-            "sourcePathId": "P1",
-            "serviceBandwidth": {
-              "value": 20,
-              "unit": "Gbit/s"
-            },
-            "includedInSourceLoad": true,
-            "direction": "CE-A-to-CE-B"
-          }
-        }
-      }
-    ]
+    "parts": [{"data": {
+      "contract": "bandwidth-planning/v1",
+      "ctTaskId": "CT-001",
+      "operation": "optimize-sr-te",
+      "demand": {"name": "A_to_D", "source": "A", "destination": "D", "traffic": 1200, "unit": "Mbps"},
+      "objective": {"metric": "maximum-interface-utilization", "target": 70, "unit": "percent"},
+      "constraints": {"preserveDemand": true, "preserveCapacities": true, "preserveReachability": true},
+      "input": {"modelRevision": "lab-overloaded-001"},
+      "authority": {"planningModelCopyChanges": true, "liveNetworkChanges": false},
+      "requiredEvidence": ["baseline-simulation", "sr-te-change-report", "optimized-simulation"]
+    }}]
   }
 }
 ```
 
-An illustrative final response follows. Its predicted utilization, headroom, and reachability values are assumed fixture outputs, not measured facts. The engine evidence supports a computed result; validation is still pending. A real implementation must retain accessible engine inputs and outputs and define authentication, evidence access, error outcomes, and schema validation.
+An illustrative final response follows. Its utilization and LSP-change counts reflect the local simulation report. Contract identifiers and structure are illustrative; this is not an observed cross-platform response. The specialist's result is computed and re-simulated; CT validation remains pending.
 
 ```json
 {
   "task": {
     "id": "cp-task-001",
     "contextId": "context-001",
-    "status": {
-      "state": "TASK_STATE_COMPLETED"
-    },
-    "artifacts": [
-      {
-        "artifactId": "planning-result-001",
-        "parts": [
-          {
-            "data": {
-              "contract": "bandwidth-planning/v1",
-              "ctTaskId": "CT-001",
-              "outcome": "feasible",
-              "candidateId": "P3",
-              "path": [
-                "CE-A",
-                "PE-A",
-                "E3",
-                "I3",
-                "PE-B",
-                "CE-B"
-              ],
-              "checks": {
-                "destinationMaximumLinkUtilizationAfterMove": {
-                  "value": 50,
-                  "maximum": 80,
-                  "unit": "percent",
-                  "pass": true
-                },
-                "sourceMaximumLinkUtilizationAfterMove": {
-                  "value": 72,
-                  "maximum": 80,
-                  "unit": "percent",
-                  "pass": true
-                },
-                "destinationPolicyHeadroomBeforeMove": {
-                  "value": 50,
-                  "minimum": 20,
-                  "unit": "Gbit/s",
-                  "pass": true
-                },
-                "destinationUnusedCapacityAfterMove": {
-                  "value": 50,
-                  "unit": "Gbit/s"
-                },
-                "vpnReachability": {
-                  "predicted": true,
-                  "pass": true
-                }
-              },
-              "evidence": {
-                "a2aTaskId": "cp-task-001",
-                "ctTaskId": "CT-001",
-                "snapshotId": "twin-snapshot-001",
-                "engineRunId": "engine-run-001",
-                "operation": "constrained-path-computation",
-                "parametersRef": "evidence://engine-run-001/parameters",
-                "outputRef": "evidence://engine-run-001/output",
-                "runTime": "2026-10-22T10:06:00Z"
-              },
-              "validation": {
-                "status": "pending"
-              },
-              "otherCandidates": [
-                {
-                  "candidateId": "P2",
-                  "feasible": true,
-                  "selected": false,
-                  "reason": "higher-utilization-after-move",
-                  "predictedMaximumLinkUtilizationAfterMove": {
-                    "value": 75,
-                    "unit": "percent"
-                  }
-                },
-                {
-                  "candidateId": "P1",
-                  "feasible": false,
-                  "reason": "keeping-current-path-exceeds-utilization-ceiling",
-                  "predictedMaximumLinkUtilization": {
-                    "value": 92,
-                    "unit": "percent"
-                  }
-                }
-              ]
-            }
-          }
-        ]
-      }
-    ]
+    "status": {"state": "TASK_STATE_COMPLETED"},
+    "artifacts": [{
+      "artifactId": "planning-result-001",
+      "parts": [{"data": {
+        "contract": "bandwidth-planning/v1",
+        "ctTaskId": "CT-001",
+        "outcome": "target-met-in-simulation",
+        "demand": {"name": "A_to_D", "traffic": 1200, "unit": "Mbps", "unchanged": true},
+        "utilization": {"baseline": 120, "target": 70, "optimized": 60, "unit": "percent"},
+        "changes": {"createdLsps": 0, "reroutedLsps": 2, "newWeightedSegmentLists": 2, "modifiedDemands": 0},
+        "congestedInterfaces": {"baseline": 3, "optimized": 0},
+        "evidence": {
+          "a2aTaskId": "cp-task-001",
+          "ctTaskId": "CT-001",
+          "inputModelRevision": "lab-overloaded-001",
+          "outputModelRevision": "lab-optimized-001",
+          "baselineReportRef": "pg1793387263093.txt",
+          "optimizedReportRef": "pg1793387332689.txt",
+          "changeReportRef": "lab-sr-te-change-report-001"
+        },
+        "liveNetworkApplied": false,
+        "validation": {"status": "pending"}
+      }}]
+    }]
   }
 }
 ```
 
-The `evidence://` references are placeholders for an agreed, resolvable evidence store; A2A does not define that URI scheme. The authenticated connection establishes the specialist's identity. CT's validator adds its own evidence, including method, state reference, constraint checks, and PASS/FAIL/INCONCLUSIVE. A correction message uses a new `messageId`, `referenceTaskIds: ["cp-task-001"]`, and optionally `contextId: "context-001"`; omit the old `taskId` so a new task can be created. A legitimate no-feasible-path result may still complete the planning task, with `outcome: "no-feasible-path"` and supporting checks instead of a selected candidate.
+Model revisions and the change-report reference are illustrative identifiers to agree in the contract. The two simulation report filenames identify the observed local run; an integrated run must retain its own accessible reports and model revisions. A task's successful completion does not establish target satisfaction: the master must inspect the simulation result, unchanged inputs, and validation evidence. An unmet target may still be a completed analysis, with an explicit outcome and explanation.
+
+The authenticated connection establishes the specialist's identity. CT's validator adds its own evidence, including method, input/output model references, demand and capacity checks, reachability checks, and PASS/FAIL/INCONCLUSIVE. A correction message uses a new `messageId`, `referenceTaskIds: ["cp-task-001"]`, and optionally `contextId: "context-001"`; omit the old `taskId` so a new task can be created.
 
 ## Making the findings credible
 
@@ -398,10 +340,10 @@ Tag every finding as **organic** (found during negotiation or integration, witho
 | Status | Work |
 | --- | --- |
 | Prepare before arrival | The task, status, and evidence tables worked out with CT, with the negotiation log kept throughout; expected findings committed by both sides; the versioned request/result contract and JSON Schema agreed, with approved inputs and expected results; an outside reviewer identified; endpoints and credentials exchanged through an agreed secure channel (never in this repository); A2A and MCP versions; the snapshot in the digital twin; a callable engine |
-| Core | One A2A delegation with MCP data retrieval; the task fields and status mapping exercised; one combined evidence view; a validated recommendation presented for review |
+| Core | One A2A delegation with MCP model retrieval; SR-TE optimization and re-simulation of an isolated model copy; task/status mapping; one combined evidence view; CT validation of the proposed plan |
 | Core checks | "Completed, but not validated"; investigate and document one organic mismatch from integration, with a corrected rerun if one is found. Finding no mismatch is a valid result; do not manufacture one. |
 | Core deliverable | The negotiation log, the filled-in tables, the versioned request/result contract, a reproducible exchange, the core checks, and a short gap report that leads with organic findings and scores the expected findings |
-| Stretch | Prioritize an independent client constructing the task and checking its evidence; then additional failure cases (unfinished task, injected capacity mismatch, broken evidence); apply P3 in the digital twin and re-measure; a utilization-definition mismatch (percentage versus fraction, or mismatched measurement windows); a changed snapshot that requires revalidation |
+| Stretch | Prioritize an independent client constructing the task and checking its evidence; then additional failure cases (unfinished task, injected capacity mismatch, broken evidence); apply an approved SR-TE configuration in an isolated emulator and measure traffic; a utilization-definition mismatch (percentage versus fraction, or mismatched measurement windows); a changed snapshot that requires revalidation |
 | Deferred | Agent registration and lifecycle, intervention and recovery, live ingestion, production authorization tests, and any live network change |
 
 The CP agent has recommendation-only authority from the start. Use CT's existing master; do not build a new orchestrator. Check the known result without claiming to benchmark the engine.
@@ -413,8 +355,8 @@ The CP agent has recommendation-only authority from the start. Use CT's existing
 | Task match | Every evidence record cites the task ID; the CP agent's identity comes from configured authentication |
 | Input match | Snapshot references, versions, collection times, and measurement windows match the task |
 | Engine execution | Engine operation, parameters, run ID, and retained output |
-| Result support | Per-candidate constraint checks agree with retained output and the expected outcome |
-| Validation | CT validation agent's PASS, FAIL, or INCONCLUSIVE for the same task, candidate, constraints, and compatible twin state; only supported PASS establishes validation |
+| Result support | Plan constraint checks agree with retained output and the expected outcome |
+| Validation | CT validation agent's PASS, FAIL, or INCONCLUSIVE for the same task, proposed plan, demand, constraints, and compatible twin state; only supported PASS establishes validation |
 
 A completed status alone is insufficient. The master shows "computed" until validation passes and flags missing or mismatched evidence as unverified. Engine execution, consistency with the approved fixture and digital-twin model, and measured service improvement are separate claims. Core scope checks the first two within the recorded assumptions; it does not establish general recommendation correctness or a live-network outcome.
 
@@ -422,28 +364,28 @@ A completed status alone is insufficient. The master shows "computed" until vali
 
 The checks below define the initial pass conditions; a fuller `Test-plan.md` is planned. The successful baseline and "completed, but not validated" are core. Investigate organic mismatches during integration; the remaining injected failures are stretch work. An intentionally triggered failure demonstrates a checker, not an independently discovered interoperability gap.
 
-- **Bandwidth-aware baseline.** With the approved proposed fixture, recommend P3 at 50% predicted destination utilization and report P1 at 72%. Report P2 at 75% as feasible but not preferred. Verify all affected links and reachability; these summary values alone do not validate the whole path.
-- **Completed, but not validated.** The CP agent returns `COMPLETED`, then CT's validation agent returns FAIL. The master must not present a validated path.
+- **Lab baseline and optimization.** Reproduce 300 Mbps / 30%, then 1,200 Mbps / 120%. Optimize toward 70% without changing the 1,200 Mbps demand or interface capacities; the recorded lab run reaches 60%, reroutes two existing LSPs, creates two weighted segment lists, and leaves zero congested interfaces. Retain the new run’s own evidence. If model inputs or algorithm behavior differ, report the actual result rather than forcing 60%.
+- **Completed, but not validated.** The CP agent returns `COMPLETED`, then CT's validation agent returns FAIL. The master must not present a validated plan.
 - **Stretch: same word, different meaning in status.** Run a task the CP agent cannot finish and record the A2A state and the CT status on each side.
-- **Stretch: a valid message with the wrong meaning.** The MCP data puts P3's total capacity (100 Gbit/s) where the CP agent expects policy headroom (50 Gbit/s before the proposed move). The message is schema-valid but P3 looks roomier than it is. Compare the source-field mapping and metric metadata against the approved fixture, make the mapping explicit, and rerun. A schema-valid number alone cannot reveal this substitution. Record whether detection came from an automated semantic check, fixture comparison, or human review; do not claim automatic detection without such a check.
+- **Stretch: a valid message with the wrong meaning.** Supply a demand value with Mbps interpreted as Gbit/s, or utilization 0.6 interpreted as 0.6% rather than 60%. Compare units and metric definitions with the approved fixture. Record whether detection came from an automated semantic check, fixture comparison, or human review; do not claim automatic detection without such a check.
 - **Stretch: broken evidence.** Alter one reference, such as a snapshot ID that does not match the task. The master flags the result as unverified.
-- **Stretch: apply the path in the digital twin.** A controller function in the twin applies P3 and the twin re-measures per-link utilization, service throughput, and reachability. Acceptance, execution, and the fresh measurement are reported separately. This is the only test that reaches the v2 deck's agent-to-controller example.
+- **Stretch: execute in an isolated emulator.** Apply an approved SR-TE configuration to emulated devices and measure traffic. Report controller acceptance, configuration execution, and fresh measurements separately. The local lab’s planning-model changes and re-simulation do not establish device execution.
 
 A deliberately incomplete contract does not establish a defect in A2A or MCP. Record whether existing models or the versioned application contract resolve each mismatch, or whether a further agreement was needed.
 
 ## Open items to agree with CT
 
 1. Walk through the task, status, and evidence tables, in particular what `END`, `EXIT`, and `WAITING` mean and what `Exist_reason` holds.
-2. Whether the digital twin can apply a path change and re-measure it.
+2. Whether CT validation is a planning-model check or includes isolated emulator configuration and traffic measurement; distinguish both from the specialist’s model edits.
 3. Hosting: CT Cloud plus AWS, or a Cisco lab over VPN; containers or VMs for CT's master and twin.
 4. Whether digital-twin data may go to AWS and to the CP agent's LLM provider.
 5. How the CP agent reaches its LLM (direct or through a proxy).
 6. Which logging system both sides use to correlate the exchange.
 7. Whether CT’s validation agent independently checks correctness, what method it uses, which assumptions it shares with the planning engine, and whether an additional reviewed expected outcome is needed.
 8. Whether the master performs initial MCP discovery as shown in the demo screenshot, and how its snapshot is pinned for the CP agent’s retrieval.
-9. The service bandwidth to move, utilization ceiling, measurement definitions, full P2 route and shared links, reachability assumptions, and application contract version.
+9. The mapping of the six-node lab into CT’s model, demand units, 70% target semantics, SR-TE weights and expanded routes, reachability checks, and application contract version.
 
-Replace the old whiteboard latency labels with the supplied utilization/capacity values and reconcile them with the approved bandwidth fixture. The board’s handwritten flow has the CP agent initiating MCP, while the demo screenshot also shows master-to-MCP discovery. Clarify the two roles and use the same snapshot reference; do not infer that two independent reads return consistent state.
+Replace the earlier 100G P1/P2/P3 illustration and 20 Gbit/s / 80% assumptions with the six-node lab: 1,000 Mbps interfaces, 300 → 1,200 Mbps demand, a 70% target, and 60% optimized utilization. The board’s handwritten flow has the CP agent initiating MCP, while the demo screenshot also shows master-to-MCP discovery. Clarify the two roles and use the same snapshot reference; do not infer that two independent reads return consistent state.
 
 ## Production freshness and pre-execution checks
 
