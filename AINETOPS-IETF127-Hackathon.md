@@ -62,33 +62,40 @@ The demo starts with a small IPv6 planning model: six nodes, six circuits, twelv
 
 This replaces the earlier illustrative 100G P1/P2/P3 scenario. The values below come from the supplied screenshots and the running Capacity Planning AI Agent session. They are simulation results for this model, not measurements from a live network.
 
-#### Diagram 1 — Initial lab topology
-
-**Six nodes · Six circuits · Twelve interfaces · Two existing SR LSPs · All interfaces: 1,000 Mbps**
-
-```mermaid
-flowchart LR
-    A(["A · source"]) --- B1("B1")
-    B1 --- C1("C1")
-    C1 --- D(["D · destination"])
-    A --- B2("B2")
-    B2 --- C2("C2")
-    C2 --- D
-
-    classDef endpoint fill:#0f172a,stroke:#334155,color:#ffffff,stroke-width:2px
-    classDef router fill:#f1f5f9,stroke:#64748b,color:#0f172a,stroke-width:2px
-    class A,D endpoint
-    class B1,B2,C1,C2 router
-    linkStyle 0,1,2,3,4,5 stroke:#64748b,stroke-width:3px
-```
-
-*The starting topology, before changing demand or running the demo simulations. The single demand, A_to_D, connects A to D. Utilization is intentionally omitted here; the subsequent simulation results establish the load on each branch.*
+**Reading the diagrams:** every link has **1,000 Mbps capacity**. Arrows show A-to-D traffic direction; percentages reproduce the simulation's reported forward-interface utilization. Gray links have no utilization value listed in the supplied baseline summary; they do not mean zero traffic or a failed path. The topology and node positions stay the same in all three drawings.
 
 #### 1. Establish a healthy baseline
 
 After loading the lab plan, the operator asks: **“change demand A_to_D traffic to 300”**, then **“list demand”**. The agent confirms that demand A_to_D runs from A to D at **300 Mbps**. Listing the demand makes the input visible before evaluating the network.
 
 The operator then asks: **“run simulation”**. The simulation reports **Optimal** network health and a maximum interface utilization of **30%**. The three loaded forward interfaces—A/GigabitEthernet1, B1/GigabitEthernet2, and C1/GigabitEthernet2—each show 30% utilization, consistent with 300 Mbps using the A → B1 → C1 → D branch.
+
+#### Diagram 1 — Healthy baseline
+
+```mermaid
+flowchart LR
+    subgraph RUN["300 Mbps demand · 30% maximum · Optimal"]
+        direction LR
+        A(["A · source"]) -->|"30%"| B1("B1")
+        B1 -->|"30%"| C1("C1")
+        C1 -->|"30%"| D(["D · destination"])
+        A -->B2("B2")
+        B2 -->C2("C2")
+        C2 -->D
+    end
+
+    classDef endpoint fill:#0f172a,stroke:#334155,color:#ffffff,stroke-width:2px
+    classDef upper fill:#eff6ff,stroke:#2563eb,color:#1e3a8a,stroke-width:2px
+    classDef lower fill:#f8fafc,stroke:#cbd5e1,color:#64748b,stroke-width:2px
+    class A,D endpoint
+    class B1,C1 upper
+    class B2,C2 lower
+    linkStyle 0,1,2 stroke:#2563eb,stroke-width:4px
+    linkStyle 3,4,5 stroke:#cbd5e1,stroke-width:2px
+    style RUN fill:#ffffff,stroke:#bfdbfe,stroke-width:2px,color:#0f172a
+```
+
+*The first simulation establishes a healthy baseline: three forward interfaces on the upper branch report 30% utilization.*
 
 #### 2. Increase demand and expose the bottleneck
 
@@ -98,30 +105,32 @@ The simulation completes successfully, but reports the network as **Critical**: 
 
 This is the first important distinction in the demo: **a successful simulation task can report an unhealthy network**. Task success describes whether the analysis ran; the result describes whether the network meets its requirements.
 
-#### Diagram 2 — Before optimization: overloaded model
-
-**Demand: 1,200 Mbps · Interface capacity: 1,000 Mbps · Maximum utilization: 120% · Health: Critical**
+#### Diagram 2 — Demand exceeds path capacity
 
 ```mermaid
 flowchart LR
-    A(["A · source"]) -->|"120%"| B1("B1")
-    B1 -->|"120%"| C1("C1")
-    C1 -->|"120%"| D(["D · destination"])
-    A --> B2("B2")
-    B2 --> C2("C2")
-    C2 --> D
+    subgraph RUN["1,200 Mbps demand · 120% maximum · Critical"]
+        direction LR
+        A(["A · source"]) -->|"120%"| B1("B1")
+        B1 -->|"120%"| C1("C1")
+        C1 -->|"120%"| D(["D · destination"])
+        A -->B2("B2")
+        B2 -->C2("C2")
+        C2 -->D
+    end
 
     classDef endpoint fill:#0f172a,stroke:#334155,color:#ffffff,stroke-width:2px
-    classDef overloaded fill:#fff1f2,stroke:#dc2626,color:#881337,stroke-width:2px
-    classDef unreported fill:#f1f5f9,stroke:#94a3b8,color:#475569,stroke-width:1px
+    classDef upper fill:#fff1f2,stroke:#dc2626,color:#881337,stroke-width:2px
+    classDef lower fill:#f8fafc,stroke:#cbd5e1,color:#64748b,stroke-width:2px
     class A,D endpoint
-    class B1,C1 overloaded
-    class B2,C2 unreported
+    class B1,C1 upper
+    class B2,C2 lower
     linkStyle 0,1,2 stroke:#dc2626,stroke-width:4px
-    linkStyle 3,4,5 stroke:#94a3b8,stroke-width:2px
+    linkStyle 3,4,5 stroke:#cbd5e1,stroke-width:2px
+    style RUN fill:#ffffff,stroke:#fca5a5,stroke-width:2px,color:#0f172a
 ```
 
-*Red labels reproduce the reported utilization on the forward interfaces A/GigabitEthernet1, B1/GigabitEthernet2, and C1/GigabitEthernet2. The lower branch is shown in gray because its baseline utilization is not listed in the supplied summary; gray does not assert zero traffic or a failed path. Values describe modeled offered load, not measured forwarding above physical capacity.*
+*Demand has increased fourfold. The same three interfaces now report 120% modeled load, exceeding their capacity.*
 
 #### 3. Ask for a better plan
 
@@ -140,18 +149,19 @@ The detailed LSP report identifies the changes as follows. These are the UI's se
 
 The final simulation reports **60% maximum utilization**, below the requested 70% target. All six forward interfaces across the two branches show 60% utilization. The report demonstrates a balanced modeled load while retaining the 1,200 Mbps demand; per-branch throughput is not separately reported in the supplied summary. No interfaces remain above 100% or above the report's 80% critical threshold, and network health changes from **Critical** to **Optimal**.
 
-#### Diagram 3 — After optimization: target met in simulation
-
-**Demand: 1,200 Mbps, unchanged · Interface capacity: 1,000 Mbps, unchanged · Target: 70% · Achieved maximum: 60% · Health: Optimal**
+#### Diagram 3 — Traffic balanced after optimization
 
 ```mermaid
 flowchart LR
-    A(["A · source"]) -->|"60%"| B1("B1")
-    B1 -->|"60%"| C1("C1")
-    C1 -->|"60%"| D(["D · destination"])
-    A -->|"60%"| B2("B2")
-    B2 -->|"60%"| C2("C2")
-    C2 -->|"60%"| D
+    subgraph RUN["1,200 Mbps demand · 60% maximum · Optimal"]
+        direction LR
+        A(["A · source"]) -->|"60%"| B1("B1")
+        B1 -->|"60%"| C1("C1")
+        C1 -->|"60%"| D(["D · destination"])
+        A -->|"60%"| B2("B2")
+        B2 -->|"60%"| C2("C2")
+        C2 -->|"60%"| D
+    end
 
     classDef endpoint fill:#0f172a,stroke:#334155,color:#ffffff,stroke-width:2px
     classDef upper fill:#eff6ff,stroke:#2563eb,color:#1e3a8a,stroke-width:2px
@@ -161,9 +171,10 @@ flowchart LR
     class B2,C2 lower
     linkStyle 0,1,2 stroke:#2563eb,stroke-width:4px
     linkStyle 3,4,5 stroke:#059669,stroke-width:4px
+    style RUN fill:#ffffff,stroke:#a7f3d0,stroke-width:2px,color:#0f172a
 ```
 
-*All six labels reproduce the optimized simulation's reported forward-interface utilization. The blue and green branches distinguish the two routes; both meet the requested target. Arrows show A-to-D traffic direction, not one-way physical circuits. The 1,200 Mbps demand is retained; the diagram does not label inferred per-branch throughput as a measured result.*
+*The optimized simulation reports 60% on all six forward interfaces. Demand stays at 1,200 Mbps; the requested 70% target is met.*
 
 | Stage | Demand A_to_D | Maximum utilization | Interfaces above 100% | Reported health |
 | --- | --- | --- | --- | --- |
