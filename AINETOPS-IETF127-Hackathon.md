@@ -11,8 +11,10 @@ The experiment tests whether both implementations understand the task, its statu
 1. **Agree on the test.** CT and Cisco pin a digital-twin snapshot and define the request: optimize the 1,200 Mbps A_to_D demand toward a 70% maximum interface-utilization target without reducing demand or capacity.
 2. **Delegate the task.** CT's master agent sends the request to the CP agent over A2A.
 3. **Compute a recommendation.** The CP agent retrieves the agreed network data through MCP, runs the planning engine, and returns its proposed SR-TE changes, before/after simulation results, and evidence.
-4. **Check the recommendation.** CT's validation agent checks the proposed SR-TE plan against a compatible model state and reports PASS, FAIL, or INCONCLUSIVE.
-5. **Report what the evidence supports.** The master presents the plan as validated only when the evidence matches and validation passes. Otherwise, it reports that the plan was computed and re-simulated but not independently validated.
+4. **Check the recommendation.** For IETF 127, CT's master temporarily performs the validation role: it checks the returned SR-TE plan and evidence against the task and agreed model references, and records PASS, FAIL, or INCONCLUSIVE.
+5. **Report what the evidence supports.** The master presents the plan as master-checked only when its checks pass and the evidence matches. Otherwise, it reports the result as computed and re-simulated, with failed or incomplete checks. Neither outcome implies independent validation.
+
+**Validation scope:** IETF 127 uses CT's master for both orchestration and result checking; there is no separate validation agent. A dedicated validation agent is planned for the IETF 128 hackathon. This keeps the first event focused on the A2A/MCP integration and records the limits of the master's checks.
 
 The local demo uses an isolated planning model. The multi-agent integration will agree how CT supplies a compatible model snapshot and validates the proposed changes. The experiment's main output is a record of what the two implementations could understand from the protocols and agreed contract, what needed further agreement, and what remains unresolved.
 
@@ -33,7 +35,7 @@ CT and Cisco built their agents independently. CT already has its own task and e
 | Problem area (v2 deck) | Covered here? |
 | --- | --- |
 | B. Task and evidence profile, agent-to-agent | **Yes, the core of the event** |
-| Acceptance versus result versus verified outcome | **Partly.** Accepted, computed, and validated in the digital twin are core. Applied and re-measured is a stretch goal. |
+| Acceptance versus result versus verified outcome | **Partly.** Accepted, computed, and master-checked are core. Separate-agent validation is planned for IETF 128; applied and re-measured remains stretch scope. |
 | B. Task and evidence profile, agent-to-controller | Only through the stretch goal. The deck's main example sits at this boundary. |
 | A. Agent operational lifecycle | No. Agent registration is bypassed. |
 | Intervention and recovery (with ICON) | No |
@@ -47,8 +49,7 @@ The hackathon tests the real problem, but only its agent-to-agent half. The gap 
 
 | Component | Provided by | Role |
 | --- | --- | --- |
-| Master agent | CT | Delegates the task over A2A, presents the result |
-| Validation agent | CT | Checks the proposed SR-TE changes and their supporting simulation evidence |
+| Master agent | CT | Delegates the task over A2A, checks the returned plan and evidence, and presents the result; temporarily performs the validation role |
 | MCP server | CT | Read-only topology, telemetry, and link performance from the digital twin |
 | Digital twin (emulator) | CT | Emulates the test network. No live network is touched. |
 | CP agent, MCP client and data adapter | Cisco, one Docker container | Accepts the task, fetches data, builds the engine input, returns the result and evidence |
@@ -186,9 +187,9 @@ Retain the demand values, model versions, LSP changes, and before-and-after simu
 
 #### How this becomes the multi-agent hackathon experiment
 
-The local lab establishes the planning workflow. The hackathon will test whether CT's master can delegate the same **1,200 Mbps demand / 70% utilization-target** task to the specialist over A2A, supply a consistent model through MCP, and interpret the returned change plan and evidence. The current local session does not itself demonstrate the CT-to-Cisco A2A/MCP integration or CT's separate validation agent.
+The local lab establishes the planning workflow. The hackathon will test whether CT's master can delegate the same **1,200 Mbps demand / 70% utilization-target** task to the specialist over A2A, supply a consistent model through MCP, and interpret the returned change plan and evidence. The current local session does not itself demonstrate the CT-to-Cisco A2A/MCP integration or CT master's result checks.
 
-The specialist may change an isolated planning-model copy to compute and re-simulate alternatives. Its external authority remains recommendation-only: it cannot deploy the plan to a live network. CT's validator must check the same demand, capacities, proposed SR-TE changes, and compatible model state before the master calls the recommendation validated. Changing a planning model, re-simulating it, independently validating it, and deploying it are distinct events.
+The specialist may change an isolated planning-model copy to compute and re-simulate alternatives. Its external authority remains recommendation-only: it cannot deploy the plan to a live network. For IETF 127, CT's master checks the task, model references, demand, capacities, proposed SR-TE changes, and supporting results before labeling the recommendation master-checked. Model edits, re-simulation, master checks, independent validation, and deployment are distinct events. A separate validation agent is planned for IETF 128.
 
 ```mermaid
 sequenceDiagram
@@ -196,22 +197,21 @@ sequenceDiagram
     participant M as CT master
     participant P as CP agent (Cisco container)
     participant S as CT MCP server / digital twin
-    participant V as CT validation agent
     O->>M: Optimize A_to_D at 1200 Mbps toward 70% utilization
     M->>P: A2A task: endpoints, objective, constraints, model revision, no live changes, evidence required
     P->>S: MCP: topology, link capacities, utilization, service traffic
     S-->>P: Data with identifiers, units, timestamps
     Note over P: Check meaning, build engine input, run engine
     P-->>M: A2A COMPLETED: SR-TE changes, before/after simulations, evidence
-    M->>V: Validate SR-TE change plan and demand in compatible model
-    V-->>M: PASS, FAIL or INCONCLUSIVE with its own evidence
-    alt Evidence matches and validation passes
-        M->>O: Present validated recommendation and simulated outcome
-    else Evidence missing or altered, or validation fails or is inconclusive
-        M->>O: Flag as computed but not validated
+    M->>M: Check task, model references, plan and evidence
+    Note over M: Temporary validation role: PASS, FAIL or INCONCLUSIVE
+    alt Evidence matches and master checks pass
+        M->>O: Present master-checked recommendation and simulated outcome
+    else Evidence missing or altered, or master checks fail or are inconclusive
+        M->>O: Report computed result with failed or incomplete checks
         M->>P: Create linked follow-up task for correction
     end
-    Note over O,V: First-event boundary — no live network change
+    Note over O,M: IETF 127: no separate validator and no live network change
 ```
 
 ### Data retrieval and validation
@@ -223,18 +223,20 @@ sequenceDiagram
 - Agree how the MCP server provides a consistent snapshot across data sources. If it cannot, record the source timestamps and limitations.
 - The CP agent must not produce a recommendation when required inputs are missing or too inconsistent to support the requested checks.
 
-#### Validation
+#### Master checks at IETF 127
 
-CT's validation agent checks the proposed SR-TE plan against the agreed constraints and a compatible digital-twin state. For the core event, validation checks an isolated planning model; it does not apply device configurations or measure live traffic. The specialist already modifies a working model and re-simulates it as part of computation. CT’s separate validation remains an integration task, not an observed result of the local lab.
+CT's master temporarily performs the validation role. It checks the returned recommendation and evidence against the task, agreed constraints, and model references. The specialist modifies an isolated model copy and re-simulates it; the master records which results and consistency checks it actually verifies. The master does not apply device configurations or measure live traffic. These checks are part of the planned integration, not an observed result of the local lab.
 
-The validation result includes:
+A separate validation agent is planned for IETF 128. For IETF 127, master-checked means that the master's documented checks passed; it does not imply independently recomputed results or independent validation.
+
+The master's check record includes:
 
 - `PASS`, `FAIL`, or `INCONCLUSIVE`
-- The validation method and digital-twin state used
-- Predicted per-interface utilization before and after optimization, unchanged demand and capacity, and reachability checks
+- The master's identity, check methods, and model references used
+- Checks performed on the reported utilization, demand and capacity preservation, and any available reachability evidence; mark unperformed or unsupported checks explicitly
 - Evidence linked to the task, proposed LSP changes, model revisions, and constraints
 
-The master may call a recommendation validated only when the result is `PASS` and its evidence matches the planning result. Otherwise, it reports the recommendation as computed but not validated.
+The master may call a recommendation master-checked only when the agreed required checks return `PASS` and the evidence matches the planning result. Missing support for a required check produces `INCONCLUSIVE`; a demonstrated violation produces `FAIL`. The master records unchecked claims rather than treating them as independently verified.
 
 Applying a configuration in an isolated device emulator and measuring traffic afterward is stretch scope. Updating and re-simulating the planning model is core computation, not device execution. If the event includes that work in its core validation, agree on the change before the event and update the scope accordingly. Neither simulated validation nor digital-twin measurement establishes a live-network outcome.
 
@@ -276,7 +278,7 @@ CT's status values and A2A's task states do not line up one to one. A2A 1.0 expl
 | --- | --- | --- |
 | `RUNNING` | `WORKING` | A rename, but the names are not shared |
 | `WAITING` | `INPUT_REQUIRED`, `AUTH_REQUIRED`, or `SUBMITTED` | Waiting for whom? |
-| `END` | `COMPLETED` | Computed, or validated? |
+| `END` | `COMPLETED` | Specialist computation completed, or CT master checks completed? |
 | `ERR` | `FAILED` | Is "no feasible path" an error or a completed negative answer? |
 | `EXIT` | `CANCELED`? | How it differs from `END` and `ERR` |
 | No equivalent | `REJECTED` | How CT shows a sub-agent refusing a task |
@@ -291,26 +293,26 @@ A completed, failed, canceled, or rejected A2A task is terminal. Correction or r
 | --- | --- | --- |
 | 1. Accepted | CP agent: `SUBMITTED` or `WORKING` | Core |
 | 2. Computed | CP agent: `COMPLETED` with result and evidence | Core |
-| 3. Validated (predicted) | CT validation agent: only PASS with matching evidence reaches this layer; specialist re-simulation alone does not | Core |
+| 3. Master-checked | CT master: agreed required checks PASS with matching evidence; specialist completion alone is insufficient | Core at IETF 127; separate-agent validation planned for IETF 128 |
 | 4. Applied to devices | Controller function in an isolated emulator | Stretch; planning-model edits do not establish this layer |
 | 5. Verified device outcome | Fresh traffic measurements in the emulator | Stretch; re-simulation alone does not establish this layer |
 
 ### Evidence model
 
-The fields combine R-6 (provenance, confidence, trace context, verification) with the v2 deck (source, time, scope, operation reference, verification result). Two parties produce evidence for one task; the master combines them for the operator.
+The fields combine R-6 (provenance, confidence, trace context, verification) with the v2 deck (source, time, scope, operation reference, verification result). The specialist produces planning evidence, and CT's master records its own checks for the operator. There is no separate validation agent at IETF 127.
 
-| Field | CP agent's evidence | CT validation agent's evidence |
+| Field | CP agent's evidence | CT master's check record |
 | --- | --- | --- |
-| Task reference | A2A task ID and CT `Task_id` | Same IDs, plus its own step |
-| Source | CP agent's authenticated identity | Validation agent's identity |
-| Time | Snapshot collection times, run time | Validation run time and input-state time |
+| Task reference | A2A task ID and CT `Task_id` | Same IDs, plus the master's check step |
+| Source | CP agent's authenticated identity | CT master's identity |
+| Time | Snapshot collection times, run time | Check time and model-state time |
 | Scope | Demand A_to_D, A to D; Tunnel100 and Tunnel200 | Same demand, affected LSPs and interfaces |
 | Inputs | Snapshot IDs retrieved over MCP | Compatible twin state ID, same proposed SR-TE changes, demand, capacities, and constraints; explain any state differences |
-| Operation reference | Engine operation, parameters, run ID | Simulation ID |
-| Result | Baseline 120% and optimized 60% maximum utilization, unchanged demand/capacity, and detailed SR-TE changes | Checks of utilization after optimization, demand preservation, capacity and reachability for core; fresh probe measurements only if the stretch execution runs |
+| Operation reference | Engine operation, parameters, run ID | Master check ID and references to inspected simulation reports |
+| Result | Baseline 120% and optimized 60% maximum utilization, unchanged demand/capacity, and detailed SR-TE changes | Recorded checks of reported utilization, demand, capacity and available reachability evidence; identify checks not performed |
 | Verification | Engine-backed prediction with traceable output; not independently validated | PASS, FAIL, or INCONCLUSIVE, with method and checks performed |
-| Limitations | Model prediction and assumptions | Twin/model validation; record shared assumptions and limits of independence |
-| Access | Reference to full engine output, and who may read it | Reference to full simulation output |
+| Limitations | Model prediction and assumptions | Master checks; no claim of independent recomputation; record shared assumptions and unchecked claims |
+| Access | Reference to full engine output, and who may read it | Accessible check record and references to inspected evidence |
 
 Also agree: whether evidence travels in a separate A2A artifact, within the result artifact, or by accessible reference; one package per task or per step (CT uses per step); and how the master builds one view from both. A structured record with saved logs is enough; no new provenance protocol or attestation is needed.
 
@@ -340,7 +342,7 @@ The first request omits `taskId`: the specialist assigns its A2A task ID. `ctTas
 }
 ```
 
-An illustrative final response follows. Its utilization and LSP-change counts reflect the local simulation report. Contract identifiers and structure are illustrative; this is not an observed cross-platform response. The specialist's result is computed and re-simulated; CT validation remains pending.
+An illustrative final response follows. Its utilization and LSP-change counts reflect the local simulation report. Contract identifiers and structure are illustrative; this is not an observed cross-platform response. The specialist's result is computed and re-simulated; CT master's checks remain pending.
 
 ```json
 {
@@ -368,7 +370,7 @@ An illustrative final response follows. Its utilization and LSP-change counts re
           "changeReportRef": "lab-sr-te-change-report-001"
         },
         "liveNetworkApplied": false,
-        "validation": {"status": "pending"}
+        "validation": {"status": "pending", "performedBy": "ct-master", "independent": false}
       }}]
     }]
   }
@@ -377,7 +379,7 @@ An illustrative final response follows. Its utilization and LSP-change counts re
 
 Model revisions and the change-report reference are illustrative identifiers to agree in the contract. The two simulation report filenames identify the observed local run; an integrated run must retain its own accessible reports and model revisions. A task's successful completion does not establish target satisfaction: the master must inspect the simulation result, unchanged inputs, and validation evidence. An unmet target may still be a completed analysis, with an explicit outcome and explanation.
 
-The authenticated connection establishes the specialist's identity. CT's validator adds its own evidence, including method, input/output model references, demand and capacity checks, reachability checks, and PASS/FAIL/INCONCLUSIVE. A correction message uses a new `messageId`, `referenceTaskIds: ["cp-task-001"]`, and optionally `contextId: "context-001"`; omit the old `taskId` so a new task can be created.
+The authenticated connection establishes the specialist's identity. CT's master adds a check record with its methods, input/output model references, checks actually performed, any unchecked claims, and PASS/FAIL/INCONCLUSIVE. This is the temporary IETF 127 validation role; the specialist does not assign the master's check outcome. A correction message uses a new `messageId`, `referenceTaskIds: ["cp-task-001"]`, and optionally `contextId: "context-001"`; omit the old `taskId` so a new task can be created.
 
 ## Making the findings credible
 
@@ -391,7 +393,7 @@ The evidence is the work it took to reach agreement. From the first technical ex
 
 ### Organic findings count more than injected ones
 
-*"You broke it on purpose and then showed your checker caught it."* The injected tests (capacity meaning, broken evidence, validation FAIL) show that the checks work. They do not show that two independent implementations disagree.
+*"You broke it on purpose and then showed your checker caught it."* The injected tests (capacity meaning, broken evidence, master-check FAIL) show that the checks work. They do not show that two independent implementations disagree.
 
 Tag every finding as **organic** (found during negotiation or integration, without being planted) or **injected** (a planned demonstration). The gap report leads with organic findings. Injected tests are reported as demonstrations of the checker, not as evidence of a gap.
 
@@ -411,11 +413,11 @@ Tag every finding as **organic** (found during negotiation or integration, witho
 | Status | Work |
 | --- | --- |
 | Prepare before arrival | The task, status, and evidence tables worked out with CT, with the negotiation log kept throughout; expected findings committed by both sides; the versioned request/result contract and JSON Schema agreed, with approved inputs and expected results; an outside reviewer identified; endpoints and credentials exchanged through an agreed secure channel (never in this repository); A2A and MCP versions; the snapshot in the digital twin; a callable engine |
-| Core | One A2A delegation with MCP model retrieval; SR-TE optimization and re-simulation of an isolated model copy; task/status mapping; one combined evidence view; CT validation of the proposed plan |
-| Core checks | "Completed, but not validated"; investigate and document one organic mismatch from integration, with a corrected rerun if one is found. Finding no mismatch is a valid result; do not manufacture one. |
+| Core | One A2A delegation with MCP model retrieval; SR-TE optimization and re-simulation of an isolated model copy; task/status mapping; one combined evidence view; CT master checks of the proposed plan |
+| Core checks | "Completed, but master checks do not pass"; investigate and document one organic mismatch from integration, with a corrected rerun if one is found. Finding no mismatch is a valid result; do not manufacture one. |
 | Core deliverable | The negotiation log, the filled-in tables, the versioned request/result contract, a reproducible exchange, the core checks, and a short gap report that leads with organic findings and scores the expected findings |
 | Stretch | Prioritize an independent client constructing the task and checking its evidence; then additional failure cases (unfinished task, injected capacity mismatch, broken evidence); apply an approved SR-TE configuration in an isolated emulator and measure traffic; a utilization-definition mismatch (percentage versus fraction, or mismatched measurement windows); a changed snapshot that requires revalidation |
-| Deferred | Agent registration and lifecycle, intervention and recovery, live ingestion, production authorization tests, and any live network change |
+| Deferred | Separate validation agent (planned for IETF 128), agent registration and lifecycle, intervention and recovery, live ingestion, production authorization tests, and any live network change |
 
 The CP agent has recommendation-only authority from the start. Use CT's existing master; do not build a new orchestrator. Check the known result without claiming to benchmark the engine.
 
@@ -427,16 +429,16 @@ The CP agent has recommendation-only authority from the start. Use CT's existing
 | Input match | Snapshot references, versions, collection times, and measurement windows match the task |
 | Engine execution | Engine operation, parameters, run ID, and retained output |
 | Result support | Plan constraint checks agree with retained output and the expected outcome |
-| Validation | CT validation agent's PASS, FAIL, or INCONCLUSIVE for the same task, proposed plan, demand, constraints, and compatible twin state; only supported PASS establishes validation |
+| Master checks | CT master's PASS, FAIL, or INCONCLUSIVE for the same task, proposed plan, demand, constraints, and model references; only supported PASS establishes master-checked status |
 
-A completed status alone is insufficient. The master shows "computed" until validation passes and flags missing or mismatched evidence as unverified. Engine execution, consistency with the approved fixture and digital-twin model, and measured service improvement are separate claims. Core scope checks the first two within the recorded assumptions; it does not establish general recommendation correctness or a live-network outcome.
+A completed status alone is insufficient. The master shows "computed" until its agreed required checks pass and flags missing or mismatched evidence as unverified. Engine execution, consistency with the approved fixture and digital-twin model, and measured service improvement are separate claims. Core scope checks the first two within the recorded assumptions; it does not establish general recommendation correctness or a live-network outcome.
 
 ## The key tests
 
-The checks below define the initial pass conditions; a fuller `Test-plan.md` is planned. The successful baseline and "completed, but not validated" are core. Investigate organic mismatches during integration; the remaining injected failures are stretch work. An intentionally triggered failure demonstrates a checker, not an independently discovered interoperability gap.
+The checks below define the initial pass conditions; a fuller `Test-plan.md` is planned. The successful baseline and "completed, but master checks do not pass" are core. Investigate organic mismatches during integration; the remaining injected failures are stretch work. An intentionally triggered failure demonstrates a checker, not an independently discovered interoperability gap.
 
 - **Lab baseline and optimization.** Reproduce 300 Mbps / 30%, then 1,200 Mbps / 120%. Optimize toward 70% without changing the 1,200 Mbps demand or interface capacities; the recorded lab run reaches 60%, reroutes two existing LSPs, creates two weighted segment lists, and leaves zero congested interfaces. Retain the new run’s own evidence. If model inputs or algorithm behavior differ, report the actual result rather than forcing 60%.
-- **Completed, but not validated.** The CP agent returns `COMPLETED`, then CT's validation agent returns FAIL. The master must not present a validated plan.
+- **Completed, but master checks do not pass.** The CP agent returns `COMPLETED`, but CT's master finds a failed required check (`FAIL`) or insufficient evidence (`INCONCLUSIVE`). It must not present the plan as master-checked. Record specialist task completion separately from the master's check outcome.
 - **Stretch: same word, different meaning in status.** Run a task the CP agent cannot finish and record the A2A state and the CT status on each side.
 - **Stretch: a valid message with the wrong meaning.** Supply a demand value with Mbps interpreted as Gbit/s, or utilization 0.6 interpreted as 0.6% rather than 60%. Compare units and metric definitions with the approved fixture. Record whether detection came from an automated semantic check, fixture comparison, or human review; do not claim automatic detection without such a check.
 - **Stretch: broken evidence.** Alter one reference, such as a snapshot ID that does not match the task. The master flags the result as unverified.
@@ -447,12 +449,12 @@ A deliberately incomplete contract does not establish a defect in A2A or MCP. Re
 ## Open items to agree with CT
 
 1. Walk through the task, status, and evidence tables, in particular what `END`, `EXIT`, and `WAITING` mean and what `Exist_reason` holds.
-2. Whether CT validation is a planning-model check or includes isolated emulator configuration and traffic measurement; distinguish both from the specialist’s model edits.
+2. Which result and evidence checks CT's master can perform for IETF 127, and what support each requires; isolated emulator execution and traffic measurement remain stretch scope.
 3. Hosting: CT Cloud plus AWS, or a Cisco lab over VPN; containers or VMs for CT's master and twin.
 4. Whether digital-twin data may go to AWS and to the CP agent's LLM provider.
 5. How the CP agent reaches its LLM (direct or through a proxy).
 6. Which logging system both sides use to correlate the exchange.
-7. Whether CT’s validation agent independently checks correctness, what method it uses, which assumptions it shares with the planning engine, and whether an additional reviewed expected outcome is needed.
+7. The master's required PASS criteria and treatment of unchecked claims; the method and independence of the separate validation agent planned for IETF 128.
 8. Whether the master performs initial MCP discovery, and how its snapshot is pinned for the CP agent’s retrieval.
 9. The mapping of the six-node lab into CT’s model, demand units, 70% target semantics, SR-TE weights and expanded routes, reachability checks, and application contract version.
 
