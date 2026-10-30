@@ -58,28 +58,7 @@ The working assumption is CT's platform in CT Cloud and the Cisco container on A
 
 ### The scenario: from an overloaded path to a balanced SR-TE plan
 
-The demo starts with a small IPv6 planning model: six nodes, six circuits, twelve interfaces, one traffic demand named `A_to_D`, and two existing Segment Routing LSPs, `Tunnel100` and `Tunnel200`. Every interface has a configured capacity of **1,000 Mbps**. There are two branches between A and D:
-
-```mermaid
-flowchart LR
-    A(["A — source"]) -->|"600 Mbps"| B1["B1"]
-    B1 --> C1["C1"]
-    C1 --> D(["D — destination"])
-    A -->|"600 Mbps"| B2["B2"]
-    B2 --> C2["C2"]
-    C2 --> D
-
-    classDef endpoint fill:#f1f5f9,stroke:#475569,color:#0f172a,stroke-width:2px
-    classDef upper fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px
-    classDef lower fill:#dcfce7,stroke:#15803d,color:#14532d,stroke-width:2px
-    class A,D endpoint
-    class B1,C1 upper
-    class B2,C2 lower
-    linkStyle 0,1,2 stroke:#2563eb,stroke-width:3px
-    linkStyle 3,4,5 stroke:#15803d,stroke-width:3px
-```
-
-*Optimized simulation: the 1,200 Mbps A_to_D demand is distributed across the two branches, consistent with 600 Mbps per branch. Every link has 1,000 Mbps capacity, giving 60% utilization. Arrows show the A-to-D traffic direction; they do not imply one-way physical circuits.*
+The demo starts with a small IPv6 planning model: six nodes, six circuits, twelve interfaces, one traffic demand named `A_to_D`, and two existing Segment Routing LSPs, `Tunnel100` and `Tunnel200`. Every interface has a configured capacity of **1,000 Mbps**. The two branches are A → B1 → C1 → D and A → B2 → C2 → D.
 
 This replaces the earlier illustrative 100G P1/P2/P3 scenario. The values below come from the supplied screenshots and the running Capacity Planning AI Agent session. They are simulation results for this model, not measurements from a live network.
 
@@ -97,6 +76,31 @@ The simulation completes successfully, but reports the network as **Critical**: 
 
 This is the first important distinction in the demo: **a successful simulation task can report an unhealthy network**. Task success describes whether the analysis ran; the result describes whether the network meets its requirements.
 
+#### Before optimization — overloaded model
+
+**Demand: 1,200 Mbps · Interface capacity: 1,000 Mbps · Maximum utilization: 120% · Health: Critical**
+
+```mermaid
+flowchart LR
+    A(["A · source"]) -->|"120%"| B1("B1")
+    B1 -->|"120%"| C1("C1")
+    C1 -->|"120%"| D(["D · destination"])
+    A --> B2("B2")
+    B2 --> C2("C2")
+    C2 --> D
+
+    classDef endpoint fill:#0f172a,stroke:#334155,color:#ffffff,stroke-width:2px
+    classDef overloaded fill:#fff1f2,stroke:#dc2626,color:#881337,stroke-width:2px
+    classDef unreported fill:#f1f5f9,stroke:#94a3b8,color:#475569,stroke-width:1px
+    class A,D endpoint
+    class B1,C1 overloaded
+    class B2,C2 unreported
+    linkStyle 0,1,2 stroke:#dc2626,stroke-width:4px
+    linkStyle 3,4,5 stroke:#94a3b8,stroke-width:2px
+```
+
+*Red labels reproduce the reported utilization on the forward interfaces A/GigabitEthernet1, B1/GigabitEthernet2, and C1/GigabitEthernet2. The lower branch is shown in gray because its baseline utilization is not listed in the supplied summary; gray does not assert zero traffic or a failed path. Values describe modeled offered load, not measured forwarding above physical capacity.*
+
 #### 3. Ask for a better plan
 
 The operator asks: **“lower utilization to 70% with details”**. The agent presents a four-step plan for approval: run a baseline simulation, optimize SR-TE bandwidth, re-run the simulation, and retrieve the resulting summary and detailed change report. As in the preceding steps, the operator approves the planned tasks before execution.
@@ -112,7 +116,32 @@ The detailed LSP report identifies the changes as follows. These are the UI's se
 
 #### 4. Re-simulate and show the outcome
 
-The final simulation reports **60% maximum utilization**, below the requested 70% target. All six forward interfaces across the two branches show 60% utilization, consistent with distributing the unchanged 1,200 Mbps demand as approximately 600 Mbps on each branch. No interfaces remain above 100% or above the report's 80% critical threshold, and network health changes from **Critical** to **Optimal**.
+The final simulation reports **60% maximum utilization**, below the requested 70% target. All six forward interfaces across the two branches show 60% utilization. The report demonstrates a balanced modeled load while retaining the 1,200 Mbps demand; per-branch throughput is not separately reported in the supplied summary. No interfaces remain above 100% or above the report's 80% critical threshold, and network health changes from **Critical** to **Optimal**.
+
+#### After optimization — target met in simulation
+
+**Demand: 1,200 Mbps, unchanged · Interface capacity: 1,000 Mbps, unchanged · Target: 70% · Achieved maximum: 60% · Health: Optimal**
+
+```mermaid
+flowchart LR
+    A(["A · source"]) -->|"60%"| B1("B1")
+    B1 -->|"60%"| C1("C1")
+    C1 -->|"60%"| D(["D · destination"])
+    A -->|"60%"| B2("B2")
+    B2 -->|"60%"| C2("C2")
+    C2 -->|"60%"| D
+
+    classDef endpoint fill:#0f172a,stroke:#334155,color:#ffffff,stroke-width:2px
+    classDef upper fill:#eff6ff,stroke:#2563eb,color:#1e3a8a,stroke-width:2px
+    classDef lower fill:#ecfdf5,stroke:#059669,color:#064e3b,stroke-width:2px
+    class A,D endpoint
+    class B1,C1 upper
+    class B2,C2 lower
+    linkStyle 0,1,2 stroke:#2563eb,stroke-width:4px
+    linkStyle 3,4,5 stroke:#059669,stroke-width:4px
+```
+
+*All six labels reproduce the optimized simulation's reported forward-interface utilization. The blue and green branches distinguish the two routes; both meet the requested target. Arrows show A-to-D traffic direction, not one-way physical circuits. The 1,200 Mbps demand is retained; the diagram does not label inferred per-branch throughput as a measured result.*
 
 | Stage | Demand A_to_D | Maximum utilization | Interfaces above 100% | Reported health |
 | --- | --- | --- | --- | --- |
