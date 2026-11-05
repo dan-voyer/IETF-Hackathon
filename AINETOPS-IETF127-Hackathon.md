@@ -15,23 +15,30 @@ The first event lasts a day and a half. **CT's master temporarily performs the v
 3. Delegate optimization toward a 70% maximum-utilization target, preserving demand and interface capacities.
 4. Return the actual SR-TE changes, before/after simulation evidence, and model references.
 5. Have CT's master check that result and report PASS, FAIL, or INCONCLUSIVE, separately from specialist task completion.
-6. Demonstrate rejection of an unsupported traffic unit and a mismatched planning context, showing enforcement of the agreed request contract; see [step 5](#5-check-that-incompatible-requests-are-rejected).
+6. Demonstrate rejection of an unsupported traffic unit and a mismatched planning context in the CP-agent interface, showing enforcement of the agreed request contract; see [step 5](#5-check-that-incompatible-requests-are-rejected).
 
 The recorded local run reaches 60% maximum utilization. The integrated experiment must report its own actual result; it must not force that number if the model or inputs differ. Work remains on the CT-to-Cisco integration; the local lab does not by itself demonstrate the A2A/MCP exchange.
 
 ## Operator quick reference
 
-Use the **CT master agent's chatbot** to run the demo. Send one command at a time, wait for the result, and approve planned tasks when prompted. The master delegates the planning work to the CP agent. The results below are the recorded local reference; report the integrated run's actual results.
+Wait until the topology shows **six nodes and two LSPs** and the **CT master agent's chatbot** input is enabled. Enter each command separately, inspect its response, and wait for the input to become available before continuing. A specialist response can appear before CT finishes updating the topology. After changing demand, use the returned update confirmation to verify the requested value.
+
+The current CT interface executes these planning requests without a separate approval prompt. The master delegates the planning work to the CP agent. The reference results below were reproduced in the CT rehearsal; report the actual results of each demo run.
 
 | Step | Command or input | What to show the audience |
 | --- | --- | --- |
 | 1 | `change demand A_to_D traffic to 300` | Confirmation that the model demand is now 300 Mbps. |
-| 2 | `list demand` | `A_to_D`, source A, destination D, traffic 300 Mbps. |
-| 3 | `run simulation` | Healthy baseline: 30% maximum utilization and reported health **Optimal**. |
-| 4 | `change demand A_to_D traffic to 1200` | Confirmation that demand is now 1,200 Mbps; interface capacities remain unchanged. |
-| 5 | `run simulation` | Overloaded baseline: 120% modeled utilization, three interfaces above 100%, and reported health **Critical**. A successful simulation can report an unhealthy network. |
-| 6 | `lower utilization to 70% with details` | Review and approve the proposed analysis steps. Show the SR-TE changes and re-simulation: the recorded run reaches 60% maximum utilization while retaining 1,200 Mbps demand and 1,000 Mbps interface capacities. |
-| 7 | Run the two rejection checks in [section 5](#5-check-that-incompatible-requests-are-rejected). | Show rejection of an unsupported traffic unit and a mismatched planning context. |
+| 2 | `run simulation` | Healthy baseline: 30% maximum utilization and reported health **Optimal**. |
+| 3 | `change demand A_to_D traffic to 1200` | Confirmation that demand is now 1,200 Mbps; interface capacities remain unchanged. |
+| 4 | `run simulation` | Overloaded baseline: 120% modeled utilization, three interfaces above 100%, and reported health **Critical**. A successful simulation can report an unhealthy network. |
+| 5 | `lower utilization to 70% with details` | Show the SR-TE changes and re-simulation: the recorded run reaches 60% maximum utilization while retaining 1,200 Mbps demand and 1,000 Mbps interface capacities. |
+| 6 | In the **CP-agent interface**, run the two rejection checks in [section 5](#5-check-that-incompatible-requests-are-rejected). | Show rejection of an unsupported traffic unit and a mismatched planning context; identify these as local CP-agent checks. |
+
+**Optional CP-agent check:** use `list demand` in the CP-agent interface to inspect `A_to_D`, its endpoints, and its traffic value. It is not a required CT master command; the tested CT chatbot returned a help message for this input.
+
+### Known issue from the CT rehearsal
+
+Demand-update responses contained conflicting statuses: a business-level `SUCCESS` alongside an engine-level `FAILED` and exception. Subsequent simulations reflected the requested demand, but the UI flagged the conflict. Inspect the full response and resolve the status discrepancy before the event; do not treat task completion or the business-level success message alone as a clean pass.
 
 ## The problem being tested
 
@@ -57,7 +64,7 @@ The demo starts with a small IPv6 planning model: six nodes, six circuits, twelv
 
 #### 1. Establish a healthy baseline
 
-After loading the lab plan, the operator asks: **“change demand A_to_D traffic to 300”**, then **“list demand”**. The agent confirms that demand A_to_D runs from A to D at **300 Mbps**. Listing the demand makes the input visible before evaluating the network.
+After loading the lab plan, the operator asks CT's master: **“change demand A_to_D traffic to 300”**. Inspect the returned update confirmation to verify that the model demand is now **300 Mbps**. An optional **“list demand”** check can be performed in the CP-agent interface; it is not part of the CT chatbot sequence.
 
 The operator then asks: **“run simulation”**. The simulation reports **Optimal** network health and a maximum interface utilization of **30%**. The three loaded forward interfaces—A/GigabitEthernet1, B1/GigabitEthernet2, and C1/GigabitEthernet2—each show 30% utilization, consistent with 300 Mbps using the A → B1 → C1 → D branch.
 
@@ -125,7 +132,7 @@ flowchart LR
 
 #### 3. Ask for a better plan
 
-The operator asks: **“lower utilization to 70% with details”**. The agent presents a four-step plan for approval: run a baseline simulation, optimize SR-TE bandwidth, re-run the simulation, and retrieve the resulting summary and detailed change report. As in the preceding steps, the operator approves the planned tasks before execution.
+The operator asks CT's master: **“lower utilization to 70% with details”**. In the tested CT interface, the agent executes the planning workflow without a separate approval prompt: run a baseline simulation, optimize SR-TE bandwidth, re-run the simulation, and retrieve the resulting summary and detailed change report. Wait for processing to finish before continuing.
 
 The optimizer works on the planning model. It does not reduce the traffic demand or change interface capacity. The detailed report shows **two existing LSPs rerouted**, **two new weighted segment lists**, **no new LSPs**, and **no modified demands**. It also reports zero latency-bound violations; that counter alone does not establish a latency guarantee, especially where no bound is configured.
 
@@ -181,7 +188,7 @@ Retain the demand values, model versions, LSP changes, and before-and-after simu
 
 The successful planning run shows what happens when the request and planning context agree. Two deliberately injected errors, exercised in the local CP-agent interface, show how the implementation responds when they do not. These are contract checks, not failures of the SR-TE optimizer; they do not by themselves demonstrate the integrated CT-to-Cisco exchange.
 
-**Presenting the checks through CT's master:** confirm that its chat integration forwards the `prompt` and `constraints` fields unchanged to the CP agent. Pasting JSON as chat text alone does not establish that these fields are forwarded. If that forwarding is unavailable, demonstrate the checks in the CP-agent interface and identify them as local checks. Preserve the incompatible inputs rather than silently correcting the unit or substituting the active plan key.
+**Where to run these checks:** submit the structured inputs below in the **CP-agent interface**. In the CT rehearsal, pasting either payload into the master's chatbot returned a help message without a new A2A request, so it did not exercise the specialist's rejection checks. Present these as local CP-agent checks. Only move them to CT's master after confirming that its integration forwards `prompt` and `constraints` unchanged. Preserve the incompatible inputs rather than silently correcting the unit or substituting the active plan key.
 
 **Test A — unsupported traffic unit**
 
