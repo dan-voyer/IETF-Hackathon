@@ -15,6 +15,7 @@ The first event lasts a day and a half. **CT's master temporarily performs the v
 3. Delegate optimization toward a 70% maximum-utilization target, preserving demand and interface capacities.
 4. Return the actual SR-TE changes, before/after simulation evidence, and model references.
 5. Have CT's master check that result and report PASS, FAIL, or INCONCLUSIVE, separately from specialist task completion.
+6. Demonstrate rejection of an unsupported traffic unit and a mismatched planning context, showing enforcement of the agreed request contract; see [step 5](#5-check-that-incompatible-requests-are-rejected).
 
 The recorded local run reaches 60% maximum utilization. The integrated experiment must report its own actual result; it must not force that number if the model or inputs differ. Work remains on the CT-to-Cisco integration; the local lab does not by itself demonstrate the A2A/MCP exchange.
 
