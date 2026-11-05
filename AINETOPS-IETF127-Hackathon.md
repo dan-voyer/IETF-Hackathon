@@ -158,9 +158,25 @@ flowchart LR
 | Increased demand, before optimization | 1,200 Mbps | 120% | 3 | Critical |
 | After SR-TE optimization and re-simulation | 1,200 Mbps | 60% | 0 | Optimal |
 
-The demo ends with the before/after comparison and LSP change details. **70% is the requested target; 60% is the achieved simulation result.** The change from 120% to 60% is a reduction of 60 percentage points, or 50% relative to the baseline. The UI's “Optimal” label is a reported health classification, not proof of a globally optimal solution.
+The planning sequence ends with the before/after comparison and LSP change details. **70% is the requested target; 60% is the achieved simulation result.** The change from 120% to 60% is a reduction of 60 percentage points, or 50% relative to the baseline. The UI's “Optimal” label is a reported health classification, not proof of a globally optimal solution.
 
 Retain the demand values, model versions, LSP changes, and before-and-after simulation results as evidence. The results should show that the 1,200 Mbps demand remains unchanged while maximum interface utilization falls from 120% to 60%, below the requested 70% target. Include the detailed routes and traffic-distribution weights where needed to explain and validate the improvement.
+
+#### 5. Check that incompatible requests are rejected
+
+The successful planning run shows what happens when the request and planning context agree. Two deliberately injected errors, exercised in the local CP-agent interface, show how the implementation responds when they do not. These are contract checks, not failures of the SR-TE optimizer; they do not by themselves demonstrate the integrated CT-to-Cisco exchange.
+
+**Unsupported traffic unit.** Submit the prompt **“change demand A_to_D traffic to 1200”** with `constraints.demand_traffic_unit` set to `percent`. The request returns `input_invalid`: the input schema requires `Mbps` for that field. The value 1,200 alone is not enough to define a traffic demand; the unit must also be understood.
+
+This can happen when one agent expresses utilization as a percentage while another expects an absolute traffic rate, or when an adapter maps a field incorrectly. A percentage also needs a reference capacity before it can be translated into a rate. Rejecting the unsupported unit avoids silently treating the request as 1,200 Mbps. This check catches an explicit unit incompatibility; it does not establish that schema-valid values have the same meaning on both sides.
+
+**Wrong planning context.** Submit **“run simulation”** with `constraints.expected_plan_key` set to the deliberately non-matching value `{00000000-0000-0000-0000-000000000000}`. The task returns `TASK_STATE_REJECTED` with `constraint_rejected`, explaining that the expected plan key does not match the active CP plan.
+
+In a multi-agent workflow, this could happen after a plan switch, a delayed request, or reuse of a reference from another session. A simulation may run correctly yet answer the wrong question if it uses a different plan. The check binds the request to the intended planning context. A matching plan key alone does not establish that the model revision is unchanged or that a returned report belongs to that revision.
+
+For each rejection, retain the request and response. Use the tool trace or model state to confirm that the rejected request did not perform the requested operation, then repeat with `Mbps` or the actual active plan key and record the outcome. The screenshots establish rejection responses; those additional records establish the effect of rejection.
+
+**Why this matters:** exchanging a readable message is only the first step. The receiving implementation must enforce the agreed units and planning context, and explain an incompatibility rather than guess. These tests give the hackathon concrete examples of which contract details must be shared across implementations.
 
 ## Multi-agent workflow
 
