@@ -19,6 +19,49 @@ The first event lasts a day and a half. **CT's master temporarily performs the v
 
 The recorded local run reaches 60% maximum utilization. The integrated experiment must report its own actual result; it must not force that number if the model or inputs differ. Work remains on the CT-to-Cisco integration; the local lab does not by itself demonstrate the A2A/MCP exchange.
 
+## Operator quick reference
+
+Use the **CT master agent's chatbot** to run the demo. Send one command at a time, wait for the result, and approve planned tasks when prompted. The master delegates the planning work to the CP agent. The results below are the recorded local reference; report the integrated run's actual results.
+
+| Step | Command or input | What to show the audience |
+| --- | --- | --- |
+| 1 | `change demand A_to_D traffic to 300` | Confirmation that the model demand is now 300 Mbps. |
+| 2 | `list demand` | `A_to_D`, source A, destination D, traffic 300 Mbps. |
+| 3 | `run simulation` | Healthy baseline: 30% maximum utilization and reported health **Optimal**. |
+| 4 | `change demand A_to_D traffic to 1200` | Confirmation that demand is now 1,200 Mbps; interface capacities remain unchanged. |
+| 5 | `run simulation` | Overloaded baseline: 120% modeled utilization, three interfaces above 100%, and reported health **Critical**. A successful simulation can report an unhealthy network. |
+| 6 | `lower utilization to 70% with details` | Review and approve the proposed analysis steps. Show the SR-TE changes and re-simulation: the recorded run reaches 60% maximum utilization while retaining 1,200 Mbps demand and 1,000 Mbps interface capacities. |
+| 7 | **Payload A** below: unsupported traffic unit | `input_invalid`; the schema requires `Mbps`, not `percent`. Explain that the receiver rejects the incompatible unit declaration. |
+| 8 | **Payload B** below: wrong planning context | `TASK_STATE_REJECTED` with `constraint_rejected`; the expected plan key does not match the active CP plan. Explain that the request targets a different planning context. |
+
+### Inputs for the two rejection checks
+
+These exact structured inputs produced the supplied local CP-agent rejection responses. **Before presenting them through CT's master, confirm that its chat integration forwards the `prompt` and `constraints` fields unchanged to the CP agent.** Pasting JSON as chat text alone does not establish that these fields are forwarded. If that forwarding is unavailable, demonstrate the checks in the CP-agent interface and identify them as local checks.
+
+**Payload A — unsupported traffic unit**
+
+```json
+{
+  "prompt": "change demand A_to_D traffic to 1200",
+  "constraints": {
+    "demand_traffic_unit": "percent"
+  }
+}
+```
+
+**Payload B — wrong planning context**
+
+```json
+{
+  "prompt": "run simulation",
+  "constraints": {
+    "expected_plan_key": "{00000000-0000-0000-0000-000000000000}"
+  }
+}
+```
+
+The all-zero key is a deliberately non-matching test value, not a key to use for normal planning. For these tests, preserve the incompatible inputs rather than silently correcting the unit or substituting the active plan key. Retain the rejection responses and confirm from the trace or model state that the requested operations were not performed. The [scenario's rejection-check step](#5-check-that-incompatible-requests-are-rejected) explains the possible causes and operational significance.
+
 ## The problem being tested
 
 The [AINETOPS problem statement](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/draft-xxx-ainetops-problem-statement-00-v1.md) identifies task and evidence models as candidate interoperability concerns (R-5 and R-6). This experiment records what the two implementations can understand using existing mechanisms and the agreed application contract, and what needs additional agreement. It covers agent-to-agent task/result exchange; agent lifecycle, intervention, and independent validation are outside this first event.
