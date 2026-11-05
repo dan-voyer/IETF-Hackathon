@@ -31,36 +31,7 @@ Use the **CT master agent's chatbot** to run the demo. Send one command at a tim
 | 4 | `change demand A_to_D traffic to 1200` | Confirmation that demand is now 1,200 Mbps; interface capacities remain unchanged. |
 | 5 | `run simulation` | Overloaded baseline: 120% modeled utilization, three interfaces above 100%, and reported health **Critical**. A successful simulation can report an unhealthy network. |
 | 6 | `lower utilization to 70% with details` | Review and approve the proposed analysis steps. Show the SR-TE changes and re-simulation: the recorded run reaches 60% maximum utilization while retaining 1,200 Mbps demand and 1,000 Mbps interface capacities. |
-| 7 | **Payload A** below: unsupported traffic unit | `input_invalid`; the schema requires `Mbps`, not `percent`. Explain that the receiver rejects the incompatible unit declaration. |
-| 8 | **Payload B** below: wrong planning context | `TASK_STATE_REJECTED` with `constraint_rejected`; the expected plan key does not match the active CP plan. Explain that the request targets a different planning context. |
-
-### Inputs for the two rejection checks
-
-These exact structured inputs produced the supplied local CP-agent rejection responses. **Before presenting them through CT's master, confirm that its chat integration forwards the `prompt` and `constraints` fields unchanged to the CP agent.** Pasting JSON as chat text alone does not establish that these fields are forwarded. If that forwarding is unavailable, demonstrate the checks in the CP-agent interface and identify them as local checks.
-
-**Payload A — unsupported traffic unit**
-
-```json
-{
-  "prompt": "change demand A_to_D traffic to 1200",
-  "constraints": {
-    "demand_traffic_unit": "percent"
-  }
-}
-```
-
-**Payload B — wrong planning context**
-
-```json
-{
-  "prompt": "run simulation",
-  "constraints": {
-    "expected_plan_key": "{00000000-0000-0000-0000-000000000000}"
-  }
-}
-```
-
-The all-zero key is a deliberately non-matching test value, not a key to use for normal planning. For these tests, preserve the incompatible inputs rather than silently correcting the unit or substituting the active plan key. Retain the rejection responses and confirm from the trace or model state that the requested operations were not performed. The [scenario's rejection-check step](#5-check-that-incompatible-requests-are-rejected) explains the possible causes and operational significance.
+| 7 | Run the two rejection checks in [section 5](#5-check-that-incompatible-requests-are-rejected). | Show rejection of an unsupported traffic unit and a mismatched planning context. |
 
 ## The problem being tested
 
@@ -210,11 +181,39 @@ Retain the demand values, model versions, LSP changes, and before-and-after simu
 
 The successful planning run shows what happens when the request and planning context agree. Two deliberately injected errors, exercised in the local CP-agent interface, show how the implementation responds when they do not. These are contract checks, not failures of the SR-TE optimizer; they do not by themselves demonstrate the integrated CT-to-Cisco exchange.
 
-**Unsupported traffic unit.** Submit the prompt **“change demand A_to_D traffic to 1200”** with `constraints.demand_traffic_unit` set to `percent`. The request returns `input_invalid`: the input schema requires `Mbps` for that field. The value 1,200 alone is not enough to define a traffic demand; the unit must also be understood.
+**Presenting the checks through CT's master:** confirm that its chat integration forwards the `prompt` and `constraints` fields unchanged to the CP agent. Pasting JSON as chat text alone does not establish that these fields are forwarded. If that forwarding is unavailable, demonstrate the checks in the CP-agent interface and identify them as local checks. Preserve the incompatible inputs rather than silently correcting the unit or substituting the active plan key.
+
+**Test A — unsupported traffic unit**
+
+Submit this structured input:
+
+```json
+{
+  "prompt": "change demand A_to_D traffic to 1200",
+  "constraints": {
+    "demand_traffic_unit": "percent"
+  }
+}
+```
+
+**Observed response:** `input_invalid`; the input schema requires `Mbps` for `constraints.demand_traffic_unit`. The value 1,200 alone is not enough to define a traffic demand; the unit must also be understood.
 
 This can happen when one agent expresses utilization as a percentage while another expects an absolute traffic rate, or when an adapter maps a field incorrectly. A percentage also needs a reference capacity before it can be translated into a rate. Rejecting the unsupported unit avoids silently treating the request as 1,200 Mbps. This check catches an explicit unit incompatibility; it does not establish that schema-valid values have the same meaning on both sides.
 
-**Wrong planning context.** Submit **“run simulation”** with `constraints.expected_plan_key` set to the deliberately non-matching value `{00000000-0000-0000-0000-000000000000}`. The task returns `TASK_STATE_REJECTED` with `constraint_rejected`, explaining that the expected plan key does not match the active CP plan.
+**Test B — wrong planning context**
+
+Submit this structured input:
+
+```json
+{
+  "prompt": "run simulation",
+  "constraints": {
+    "expected_plan_key": "{00000000-0000-0000-0000-000000000000}"
+  }
+}
+```
+
+**Observed response:** `TASK_STATE_REJECTED` with `constraint_rejected`, explaining that the expected plan key does not match the active CP plan. The all-zero key is a deliberately non-matching test value, not a key to use for normal planning.
 
 In a multi-agent workflow, this could happen after a plan switch, a delayed request, or reuse of a reference from another session. A simulation may run correctly yet answer the wrong question if it uses a different plan. The check binds the request to the intended planning context. A matching plan key alone does not establish that the model revision is unchanged or that a returned report belongs to that revision.
 
