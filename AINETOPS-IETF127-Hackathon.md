@@ -15,7 +15,7 @@ The first event lasts a day and a half. **CT's master temporarily performs the v
 3. Delegate optimization toward a 70% maximum-utilization target, preserving demand and interface capacities.
 4. Return the actual SR-TE changes, before/after simulation evidence, and model references.
 5. Have CT's master check that result and report PASS, FAIL, or INCONCLUSIVE, separately from specialist task completion.
-6. Demonstrate rejection of an unsupported traffic unit and a mismatched planning context in the CP-agent interface, showing enforcement of the agreed request contract; see [step 5](#5-check-that-incompatible-requests-are-rejected).
+6. Demonstrate rejection of an unsupported traffic unit and a mismatched planning context through the CT master agent, showing enforcement of the agreed request contract; see [step 5](#5-check-that-incompatible-requests-are-rejected).
 
 The recorded local run reaches 60% maximum utilization. The integrated experiment must report its own actual result; it must not force that number if the model or inputs differ. Work remains on the CT-to-Cisco integration; the local lab does not by itself demonstrate the A2A/MCP exchange.
 
@@ -32,7 +32,7 @@ The current CT interface executes these planning requests without a separate app
 | 3 | `change demand A_to_D traffic to 1200` | Confirmation that demand is now 1,200 Mbps; interface capacities remain unchanged. |
 | 4 | `run simulation` | Overloaded baseline: 120% modeled utilization, three interfaces above 100%, and reported health **Critical**. A successful simulation can report an unhealthy network. |
 | 5 | `lower utilization to 70% with details` | Show the SR-TE changes and re-simulation: the recorded run reaches 60% maximum utilization while retaining 1,200 Mbps demand and 1,000 Mbps interface capacities. |
-| 6 | In the **CP-agent interface**, run the two rejection checks in [section 5](#5-check-that-incompatible-requests-are-rejected). | Show rejection of an unsupported traffic unit and a mismatched planning context; identify these as local CP-agent checks. |
+| 6 | In the **CT master agent's chatbot**, submit the two structured inputs in [section 5](#5-check-that-incompatible-requests-are-rejected), one at a time. | Show the returned rejection for the unsupported traffic unit and the mismatched planning context, with the corresponding request/response trace. |
 
 **Optional CP-agent check:** use `list demand` in the CP-agent interface to inspect `A_to_D`, its endpoints, and its traffic value. It is not a required CT master command; the tested CT chatbot returned a help message for this input.
 
@@ -186,9 +186,9 @@ Retain the demand values, model versions, LSP changes, and before-and-after simu
 
 #### 5. Check that incompatible requests are rejected
 
-The successful planning run shows what happens when the request and planning context agree. Two deliberately injected errors, exercised in the local CP-agent interface, show how the implementation responds when they do not. These are contract checks, not failures of the SR-TE optimizer; they do not by themselves demonstrate the integrated CT-to-Cisco exchange.
+The successful planning run shows what happens when the request and planning context agree. Two deliberately injected errors, submitted through CT's master to the CP agent, show how the workflow reports a violation of the agreed request contract.
 
-**Where to run these checks:** submit the structured inputs below in the **CP-agent interface**. In the CT rehearsal, pasting either payload into the master's chatbot returned a help message without a new A2A request, so it did not exercise the specialist's rejection checks. Present these as local CP-agent checks. Only move them to CT's master after confirming that its integration forwards `prompt` and `constraints` unchanged. Preserve the incompatible inputs rather than silently correcting the unit or substituting the active plan key.
+**Where to run these checks:** paste each structured input below into the **CT master agent's chatbot**, one at a time, and wait for the response. Keep `prompt` and `constraints` unchanged through the handoff to the CP agent, including the deliberately unsupported unit and non-matching plan key. Show the rejection returned through CT's master and use the request/response trace to confirm which constraint was rejected.
 
 **Test A — unsupported traffic unit**
 
@@ -203,7 +203,7 @@ Submit this structured input:
 }
 ```
 
-**Observed response:** `input_invalid`; the input schema requires `Mbps` for `constraints.demand_traffic_unit`. The value 1,200 alone is not enough to define a traffic demand; the unit must also be understood.
+**Expected rejection:** `input_invalid`; the input schema requires `Mbps` for `constraints.demand_traffic_unit`. The value 1,200 alone is not enough to define a traffic demand; the unit must also be understood.
 
 This can happen when one agent expresses utilization as a percentage while another expects an absolute traffic rate, or when an adapter maps a field incorrectly. A percentage also needs a reference capacity before it can be translated into a rate. Rejecting the unsupported unit avoids silently treating the request as 1,200 Mbps. This check catches an explicit unit incompatibility; it does not establish that schema-valid values have the same meaning on both sides.
 
@@ -220,11 +220,11 @@ Submit this structured input:
 }
 ```
 
-**Observed response:** `TASK_STATE_REJECTED` with `constraint_rejected`, explaining that the expected plan key does not match the active CP plan. The all-zero key is a deliberately non-matching test value, not a key to use for normal planning.
+**Expected rejection:** `TASK_STATE_REJECTED` with `constraint_rejected`, explaining that the expected plan key does not match the active CP plan. The all-zero key is a deliberately non-matching test value, not a key to use for normal planning.
 
 In a multi-agent workflow, this could happen after a plan switch, a delayed request, or reuse of a reference from another session. A simulation may run correctly yet answer the wrong question if it uses a different plan. The check binds the request to the intended planning context. A matching plan key alone does not establish that the model revision is unchanged or that a returned report belongs to that revision.
 
-For each rejection, retain the request and response. Use the tool trace or model state to confirm that the rejected request did not perform the requested operation, then repeat with `Mbps` or the actual active plan key and record the outcome. The screenshots establish rejection responses; those additional records establish the effect of rejection.
+For each rejection, retain the input submitted to CT's master, the forwarded request to the CP agent, and the response presented by the master. Use the tool trace or model state to confirm that the rejected request did not perform the requested operation, then repeat with `Mbps` or the actual active plan key and record the outcome.
 
 **Why this matters:** exchanging a readable message is only the first step. The receiving implementation must enforce the agreed units and planning context, and explain an incompatibility rather than guess. These tests give the hackathon concrete examples of which contract details must be shared across implementations.
 
@@ -289,7 +289,7 @@ The master records its identity, check methods, evidence references, per-check o
 | --- | --- |
 | Prepare | Confirm endpoints, authentication, protocol versions, application contract, model references, engine access, accessible artifacts, and the master's required checks. Keep credentials outside the repository. |
 | Core | One end-to-end A2A task with MCP data retrieval, SR-TE optimization/re-simulation, an inspectable change artifact, and a master check record. |
-| Core checks | Reproduce the lab progression and distinguish a completed specialist task from a result whose master checks fail or remain inconclusive. Investigate organic integration mismatches if they arise; no mismatch is a valid finding. |
+| Core checks | Reproduce the lab progression, run both rejection checks through CT's master, and distinguish a completed specialist task from a result whose master checks fail or remain inconclusive. Investigate organic integration mismatches if they arise; no such mismatch is a valid finding. |
 | Core output | A reproducible exchange, the task/result contract and mappings, proposed changes and evidence, the master's check record, and a short findings report. |
 | Stretch | Independent contract consumer; additional status, semantic, evidence-binding or changed-snapshot tests; isolated emulator execution and traffic measurement. These are not required for the first demonstration. |
 | Deferred | Separate validation agent, planned for IETF 128; lifecycle, intervention/recovery, live ingestion, production authorization tests, and live-network changes. |
