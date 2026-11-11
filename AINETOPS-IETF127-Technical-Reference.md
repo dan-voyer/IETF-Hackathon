@@ -2,11 +2,11 @@
 
 [Return to the hackathon plan](AINETOPS-IETF127-Hackathon.md).
 
-This companion contains implementation and reporting detail. The main plan defines the demonstration, core scope, and master checks. No separate validation agent is required for IETF 127; one is planned for IETF 128. Existing MCP input specifications are not repeated here.
+This companion describes the agent-to-agent contract and evidence. The main script covers the demo, CT master checks, and application to the lab network through CT's network-control function. A separate validation agent is planned for IETF 128. Existing MCP input specifications are not repeated here.
 
 ## Technical reference: task and evidence model
 
-This is the heart of the hackathon. The SR-TE optimization is the vehicle; the task and evidence around it are what we test. Work out these tables with CT before the event and keep a [negotiation log](#the-negotiation-log-is-the-primary-evidence) while doing it; the event then checks that the agreed mapping works.
+The SR-TE scenario makes the agent exchange concrete: what was requested, which constraints crossed the boundary, what the CP agent returned, and what CT checked and applied. Use these mappings to document the implemented contract and retain a [negotiation log](#the-negotiation-log-is-the-primary-evidence).
 
 CT's existing model (slide *Task Model / Evidence Model in Configuration Generation*) has these task fields: `Task_id`, `Type`, `Goal`, `Target`, `Mode` (for example `PLAN (READ_ONLY)`), `Window`, `Current-step`, `Current-Job`, `Process_flow`, `Status`, `Exist_reason`, `Check_point`, `Device`, `Process_result`, `Output`. Its evidence is `dict(step, JSON)`, used today only in the validation stage. CT should confirm whether these fields are what its platform implements or an illustration for the configuration-generation use case. The spelling `Exist_reason` is retained from the supplied model; confirm whether the implemented field is `Exist_reason` or `Exit_reason` before finalizing the mapping.
 
@@ -14,7 +14,7 @@ CT's existing model (slide *Task Model / Evidence Model in Configuration Generat
 
 Use a versioned planning request/result contract carried in standard A2A 1.0 message data parts and result artifacts. This hackathon does not define or negotiate an A2A protocol extension. Agree the application contract identifier, supported versions, required fields, and unsupported-version behavior before testing. The JSON examples below identify that contract through `contract: "bandwidth-planning/v1"` inside the application data.
 
-Before integration, express the application request and result contract as versioned JSON Schema, with required fields, units, error outcomes, and unsupported-version behavior. Pair it with an approved input fixture and expected results, including a no-feasible-path case. Schema validation checks structure; semantic checks still require documented definitions and fixture evidence. These are preparation deliverables, not artifacts already supplied by this document.
+Retain the implemented request/result schema, fixtures, and expected error outcomes. The script's `prompt` and `constraints` objects are **CT chatbot inputs**; capture the forwarded CP-agent request to document their actual mapping. The `bandwidth-planning/v1` example below is a **proposed contract**, not a captured exchange. Preserve the test constraints across the handoff. Schema validation alone does not establish shared meaning.
 
 The useful finding is which network semantics required an additional agreement, whether existing models already define them, and whether the issue is network-specific or generic. For each field below, distinguish the core A2A carrier from our application-defined meaning. Document that meaning in the request/result contract and record any remaining out-of-band agreements.
 
@@ -27,7 +27,7 @@ The useful finding is which network semantics required an additional agreement, 
 | Objective | `Goal` | Core: message text or structured data part; objective semantics are application-defined | Reduce maximum interface utilization toward 70% for the unchanged 1,200 Mbps demand; agree units, direction, and model revision |
 | Network scope | `Target`, `Device` | Application contract in a data part; content not defined by A2A | How nodes, links, and endpoints are named on both sides, for example [RFC 8345](https://www.rfc-editor.org/info/rfc8345) IDs |
 | Constraints | Inside `Goal`? | Application contract in a data part | Preserve the 1,200 Mbps demand, 1,000 Mbps interface capacities, and reachability; target maximum utilization of 70% |
-| Authority | `Mode` | Application contract; permissions enforced by platform/tool access controls | How isolated model edits are allowed while live-network changes are prohibited, and who enforces that boundary |
+| Authority | `Mode` | Application contract; platform/tool access controls enforce it | CP agent edits the planning model; CT controls application to the lab network. Production-network changes are excluded |
 | Time validity | `Window` | Application contract in a data part | Task validity or data measurement window? |
 | Input data | Not present | Application contract in a data part | Which snapshot to use |
 | Progress | `Process_flow`, `Current-step`, `Check_point` | Status message, history | Whether a sub-agent reports steps, and whether CT's human check points apply to it |
@@ -45,7 +45,7 @@ CT's status values and A2A's task states do not line up one to one. A2A 1.0 expl
 | `END` | `COMPLETED` | Specialist computation completed, or CT master checks completed? |
 | `ERR` | `FAILED` | Is "no feasible path" an error or a completed negative answer? |
 | `EXIT` | `CANCELED`? | How it differs from `END` and `ERR` |
-| No equivalent | `REJECTED` | How CT shows a sub-agent refusing a task |
+| Record CT mapping | `REJECTED` | How CT presents a refused task and preserves the specialist's rejection reason |
 
 ### Outcome layers
 
@@ -53,13 +53,15 @@ For this planning contract, the CP agent's `TASK_STATE_COMPLETED` means it finis
 
 A completed, failed, canceled, or rejected A2A task is terminal. Correction or replanning after completion creates a new task, linked to the prior task using `referenceTaskIds` and, where appropriate, the same `contextId`. Do not send a correction as another message on the completed task. The overall CT workflow may remain open while the specialist's individual task is complete.
 
+The unit test reports `input_invalid`; the plan-context test reports `TASK_STATE_REJECTED` with `constraint_rejected`. Preserve that distinction in CT's response and record where rejection occurred, with a task ID when one exists.
+
 | Layer | Reported by | In this event |
 | --- | --- | --- |
 | 1. Accepted | CP agent: `SUBMITTED` or `WORKING` | Core |
 | 2. Computed | CP agent: `COMPLETED` with result and evidence | Core |
 | 3. Master-checked | CT master: agreed required checks PASS with matching evidence; specialist completion alone is insufficient | Core at IETF 127; separate-agent validation planned for IETF 128 |
-| 4. Applied to devices | Controller function in an isolated emulator | Stretch; planning-model edits do not establish this layer |
-| 5. Verified device outcome | Fresh traffic measurements in the emulator | Stretch; re-simulation alone does not establish this layer |
+| 4. Applied to the lab network | CT network-control function: execution status and configuration read-back | Core; planning-model edits do not establish application |
+| 5. Observed network outcome | CT platform: fresh lab-network observations | Core; compare measured results with the target; re-simulation alone is insufficient |
 
 ### Evidence model
 
@@ -73,16 +75,16 @@ The fields combine R-6 (provenance, confidence, trace context, verification) wit
 | Scope | Demand A_to_D, A to D; Tunnel100 and Tunnel200 | Same demand, affected LSPs and interfaces |
 | Inputs | Snapshot IDs retrieved over MCP | Compatible twin state ID, same proposed SR-TE changes, demand, capacities, and constraints; explain any state differences |
 | Operation reference | Engine operation, parameters, run ID | Master check ID and references to inspected simulation reports |
-| Result | Baseline 120% and optimized 60% maximum utilization, unchanged demand/capacity, and detailed SR-TE changes | Recorded checks of reported utilization, demand, capacity and available reachability evidence; identify checks not performed |
+| Result | Actual baseline and optimized simulation results (recorded run: 120% → 60%), unchanged demand/capacity, and SR-TE changes | Checks of reported utilization, demand, capacity and available reachability evidence; identify checks not performed |
 | Verification | Engine-backed prediction with traceable output; not independently validated | PASS, FAIL, or INCONCLUSIVE, with method and checks performed |
 | Limitations | Model prediction and assumptions | Master checks; no claim of independent recomputation; record shared assumptions and unchecked claims |
 | Access | Reference to full engine output, and who may read it | Accessible check record and references to inspected evidence |
 
-Also agree: whether evidence travels in a separate A2A artifact, within the result artifact, or by accessible reference; one package per task or per step (CT uses per step); and how the master builds one view from both. A structured record with saved logs is enough; no new provenance protocol or attestation is needed.
+Record how evidence travels—in an A2A artifact or accessible reference—and how CT correlates it with the task. CT separately retains execution status, configuration read-back, and post-change observations. A structured record with saved logs is enough; simulation evidence alone does not establish network application.
 
-### Illustrative A2A request and result
+### Illustrative A2A planning request
 
-These are illustrative A2A 1.0 HTTP+JSON message bodies, not captured traffic or a complete application schema. The request uses `POST /message:send`, `Content-Type: application/a2a+json`, and `A2A-Version: 1.0`. Other A2A bindings have different envelopes. Fields inside each `data` object belong to our proposed planning contract, not the A2A core specification. The example uses the observed lab demand of 1,200 Mbps and requested 70% target. It illustrates the proposed integration contract; it is not captured A2A traffic.
+This illustrative A2A 1.0 HTTP+JSON request uses `POST /message:send`, `Content-Type: application/a2a+json`, and `A2A-Version: 1.0`. It is not captured traffic or a complete schema. Fields inside `data` belong to the proposed planning contract. The authority restriction applies to the CP agent; CT's later network execution is separate. Record the actual binding and contract used in the demo.
 
 The first request omits `taskId`: the specialist assigns its A2A task ID. `ctTaskId` preserves the master's correlation ID.
 
@@ -108,7 +110,7 @@ The first request omits `taskId`: the specialist assigns its A2A task ID. `ctTas
 
 ### Result artifacts and the proposed SR-TE changes
 
-Return a result artifact containing the task identifiers, outcome, requested target, reported baseline and optimized utilization, and the master's check status (initially pending). Also return an accessible **SR-TE change artifact**. A count such as “two LSPs rerouted” is a summary, not the proposed plan.
+Return a result artifact with task identifiers, planning outcome, requested target, and baseline/optimized utilization, plus an accessible **SR-TE change artifact**. CT maintains its check and execution status separately. A count such as “two LSPs rerouted” is a summary, not the proposed plan.
 
 | Change-artifact content | Required information |
 | --- | --- |
@@ -130,40 +132,31 @@ CT's master adds its own check record: the methods, evidence inspected, check ou
 
 ## Making the findings credible
 
-A reviewer at the BoF will ask four questions. The plan answers each one in advance.
-
 ### The negotiation log is the primary evidence
 
-*"You agreed a custom mapping with one partner. So what?"* If CT and Cisco simply agree the tables and then run them, the event only shows that a bilateral agreement works. That is exactly the per-integration translation the problem statement says does not scale.
+Record what CT and Cisco had to agree on: each interpretation, operational consequence, existing mechanism considered, and resolution. Note whether another implementation could reuse that resolution. Integration effort alone does not establish a standards gap; the demonstrated exchange and retained evidence must support the conclusion.
 
-The evidence is the work it took to reach agreement. From the first technical exchange with CT, log every question the two sides had to settle in `Negotiation-log.md` (planned): the question, which table row it belongs to, the options considered, the decision, where the decision is carried (core A2A, the versioned application contract, or out-of-band only), how many rounds it took, and whether a third implementation would need the same agreement. For each finding, record the two interpretations, the operational consequence, whether an existing specification or model covers it, and how it was resolved. Record whether another implementation could reuse that resolution without bilateral clarification. The event then confirms that the agreed mapping works, and records anything the negotiation missed.
+### Distinguish integration findings from injected tests
 
-### Organic findings count more than injected ones
+The [two rejection tests](AINETOPS-IETF127-Hackathon.md#6-check-that-incompatible-requests-are-rejected)—unsupported traffic unit and wrong planning context—demonstrate contract enforcement through CT's master. They do not establish an industry-wide gap or validate returned evidence. Tag findings as **organic** or **injected**, and record where existing mechanisms were sufficient.
 
-*"You broke it on purpose and then showed your checker caught it."* The injected tests (capacity meaning, broken evidence, master-check FAIL) show that the checks work. They do not show that two independent implementations disagree.
+### Keep predictions and observations separate
 
-Tag every finding as **organic** (found during negotiation or integration, without being planted) or **injected** (a planned demonstration). The gap report leads with organic findings. Injected tests are reported as demonstrations of the checker, not as evidence of a gap.
+Preserve any predictions made before testing with their original dates. Distinguish them from explanations written after seeing the results. Record unexpected findings and predictions that did not hold.
 
-### Write down the expected findings first
+### Optional independent review
 
-*"You found what you were looking for."* CT and Cisco are both authors of the problem statement. Before the first integration run, each side commits its predicted findings to `Expected-findings.md` (planned), with the date. The gap report then lists which predictions held, which did not, and which findings nobody predicted. Predictions that failed, and findings that existing specifications were enough, get equal space.
-
-### Bring in someone outside the two teams
-
-*"Two co-authors graded their own homework."* Use at least one of these, and preferably both:
-
-- **An outside reviewer.** Someone active in A2A or ICON, from neither CT nor Cisco, classifies each finding: implementation issue, missing profile, or specification gap, and whether it is network-specific.
-- **An independent consumer of the contract.** A generic A2A SDK client can check protocol compatibility, but is not automatically a second master implementation. For a portability test, a separately implemented client must construct the planning request and interpret and validate the returned evidence from the contract documentation, without copying CT-specific mapping logic. Record any extra agreements it needs. Results can strengthen a candidate profile finding but do not alone establish a standards gap.
+An outside reviewer or separately implemented contract consumer can strengthen the findings. This is additional work, not required for the core demo. A generic A2A SDK client alone does not establish portability of the network-management contract.
 
 ## Production freshness and pre-execution checks
 
-For operational bandwidth-aware path selection, inputs must be fresh enough for the decision, typically using near-real-time topology, availability, link capacity, utilization, and service traffic from the operator platform. The specialist can consume a consistent snapshot when tasked rather than maintain its own telemetry feed. Agree maximum input age, measurement windows, source alignment, validity conditions, and changes that invalidate a result. Long-term capacity forecasting also needs representative history and growth assumptions. These production requirements do not expand the first event beyond its prepared snapshot.
+For operational bandwidth-aware path selection, inputs must be fresh enough for the decision, typically using near-real-time topology, availability, link capacity, utilization, and service traffic from the operator platform. The specialist can consume a consistent snapshot when tasked rather than maintain its own telemetry feed. Agree maximum input age, measurement windows, source alignment, validity conditions, and changes that invalidate a result. Long-term capacity forecasting also needs representative history and growth assumptions. The demo uses prepared planning inputs and post-change lab observations; continuous production telemetry remains outside scope.
 
 Before applying an approved plan, a separate authorized executor checks current conditions and permissions. If the plan would now cause congestion or violate constraints, pause and request replanning through a linked new task. If another path is merely better while the approved path remains valid, operator policy determines whether to proceed or optimize again; use thresholds and a replanning budget to avoid oscillation. Materially revised plans require authorization as appropriate. Current-state checks alone do not prevent concurrent resource changes; controller-supported admission or reservation mechanisms may be needed. After execution, assurance measures the outcome and coordinates authorized recovery when necessary; rollback is not automatically safe.
 
 ## Background references
 
-- [AINETOPS problem statement (draft)](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/draft-xxx-ainetops-problem-statement-00-v1.md) and [slides (PDF)](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/AINETOps%20Problem%20Statement.pdf)
+- [AINETOPS problem statement (draft)](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/draft-xxx-ainetops-problem-statement-00-v2.md) and [slides (PDF)](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/AINETOps%20Problem%20Statement.pdf)
 - [AINETOPS BoF proposal for IETF 127](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/AINETOPS-BoF-Proposal-IETF127.md)
 - [A2A specification](https://a2a-protocol.org/latest/specification/). Record the actual version used in the experiment.
 - [MCP tool specification, 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)
