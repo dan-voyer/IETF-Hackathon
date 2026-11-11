@@ -2,9 +2,9 @@
 
 ## In brief
 
-China Telecom (CT) and Cisco will test whether their independently developed agents can exchange a network-planning task and understand its result and evidence. CT's master delegates the task to Cisco's capacity-planning agent (the **CP agent**) over A2A. The specialist retrieves the agreed model data through CT's MCP server, optimizes SR-TE in an isolated model copy, and returns the proposed changes with simulation evidence.
+China Telecom (CT) and Cisco will demonstrate **agent-to-agent network management**. CT's master delegates bandwidth-aware SR-TE planning to Cisco's capacity-planning agent (the **CP agent**) over A2A. The CP agent uses the agreed model data from CT's MCP server and returns proposed changes with simulation evidence. CT's master checks the result and coordinates application to the lab network. The focus is the exchange of tasks, constraints, results, evidence, and errors between the agents.
 
-The first event lasts a day and a half. **CT's master temporarily performs the validation role at IETF 127.** A separate validation agent is planned for IETF 128. Results are described as **master-checked**, without claiming independent validation or a live-network outcome.
+The first event lasts a day and a half. **CT's master temporarily performs the validation role at IETF 127.** A separate validation agent is planned for IETF 128. Report the **master-checked** recommendation, network application, and observed outcome separately; master checks do not constitute independent validation.
 
 **Review pointer:** [Proposed wording on what the findings can establish](#proposed-wording-on-what-the-findings-can-establish) is marked for team review.
 
@@ -15,9 +15,10 @@ The first event lasts a day and a half. **CT's master temporarily performs the v
 3. Delegate optimization toward a 70% maximum-utilization target, preserving demand and interface capacities.
 4. Return the actual SR-TE changes, before/after simulation evidence, and model references.
 5. Have CT's master check that result and report PASS, FAIL, or INCONCLUSIVE, separately from specialist task completion.
-6. Demonstrate rejection of an unsupported traffic unit and a mismatched planning context through the CT master agent, showing enforcement of the agreed request contract; see [step 5](#5-check-that-incompatible-requests-are-rejected).
+6. Have CT apply the accepted SR-TE recommendation to the lab network and report the application status and observed outcome.
+7. Demonstrate rejection of an unsupported traffic unit and a mismatched planning context through CT's master; see [step 6](#6-check-that-incompatible-requests-are-rejected).
 
-The recorded local run reaches 60% maximum utilization. The integrated experiment must report its own actual result; it must not force that number if the model or inputs differ. Work remains on the CT-to-Cisco integration; the local lab does not by itself demonstrate the A2A/MCP exchange.
+The CT rehearsal reproduced the planning sequence below; the rejection checks are now part of the CT master workflow. The recorded 60% maximum utilization is a **simulation result**. Retain the demo's A2A/MCP traces, change artifacts, and master-check record. Record network application and post-change measurements separately, using the actual outcome of the run.
 
 ## Operator quick reference
 
@@ -32,7 +33,8 @@ The current CT interface executes these planning requests without a separate app
 | 3 | `change demand A_to_D traffic to 1200` | Confirmation that demand is now 1,200 Mbps; interface capacities remain unchanged. |
 | 4 | `run simulation` | Overloaded baseline: 120% modeled utilization, three interfaces above 100%, and reported health **Critical**. A successful simulation can report an unhealthy network. |
 | 5 | `lower utilization to 70% with details` | Show the SR-TE changes and re-simulation: the recorded run reaches 60% maximum utilization while retaining 1,200 Mbps demand and 1,000 Mbps interface capacities. |
-| 6 | In the **CT master agent's chatbot**, submit the two structured inputs in [section 5](#5-check-that-incompatible-requests-are-rejected), one at a time. | Show the returned rejection for the unsupported traffic unit and the mismatched planning context, with the corresponding request/response trace. |
+| 6 | Apply the accepted SR-TE plan through CT's master. **Confirm the exact command or UI action with CT.** | Execution status, configuration read-back, and post-change network observations, separate from the simulated 60% result. |
+| 7 | In the **CT master agent's chatbot**, submit the two structured inputs in [section 6](#6-check-that-incompatible-requests-are-rejected), one at a time. | Show each returned rejection and its request/response trace. |
 
 **Optional CP-agent check:** use `list demand` in the CP-agent interface to inspect `A_to_D`, its endpoints, and its traffic value. It is not a required CT master command; the tested CT chatbot returned a help message for this input.
 
@@ -42,19 +44,20 @@ Demand-update responses contained conflicting statuses: a business-level `SUCCES
 
 ## The problem being tested
 
-The [AINETOPS problem statement](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/draft-xxx-ainetops-problem-statement-00-v1.md) identifies task and evidence models as candidate interoperability concerns (R-5 and R-6). This experiment records what the two implementations can understand using existing mechanisms and the agreed application contract, and what needs additional agreement. It covers agent-to-agent task/result exchange; agent lifecycle, intervention, and independent validation are outside this first event.
+The [AINETOPS problem statement](https://github.com/dan-voyer/IETF/blob/main/AINETOPS-proposal/draft-xxx-ainetops-problem-statement-00-v2.md) identifies task and evidence models as candidate interoperability concerns (R-5 and R-6). This experiment records what the two implementations can understand using existing mechanisms and the agreed application contract, and what needs additional agreement. It covers agent-to-agent task/result exchange; agent lifecycle, intervention, and independent validation are outside this first event.
 
 ### Who provides what
 
 | Component | Provided by | Role |
 | --- | --- | --- |
-| Master agent | CT | Delegates the task over A2A, checks the returned plan and evidence, and presents the result; temporarily performs the validation role |
+| Master agent | CT | Delegates over A2A, checks the plan and evidence, coordinates network application, and presents the outcome; temporarily performs the validation role |
 | MCP server | CT | Read-only topology, telemetry, and link performance from the digital twin |
-| Digital twin (emulator) | CT | Emulates the test network. No live network is touched. |
+| Digital twin (emulator) | CT | Provides the lab network for the scenario; production networks are outside scope. |
+| Network-control function | CT | Applies the accepted SR-TE changes to the lab network and provides execution status, configuration read-back, and post-change observations; not another agent |
 | CP agent, MCP client and data adapter | Cisco, one Docker container | Accepts the task, fetches data, builds the engine input, returns the result and evidence |
 | Planning engine | Cisco | Optimizes SR-TE paths and weights in an isolated model, then re-simulates utilization. Confirm its APIs first. |
 
-The working assumption is CT's platform in CT Cloud and the Cisco container on AWS, over public IPs. CT initiates A2A; the CP agent initiates MCP. An alternative, still to be agreed, is CT's master and digital twin in a Cisco lab over VPN. Run the full exchange end to end before the event.
+Confirm hosting and connectivity for the demo. CT initiates A2A; the CP agent initiates MCP. Network application uses CT's network-control function, separate from the read-only MCP data interface.
 
 ### The scenario: from an overloaded path to a balanced SR-TE plan
 
@@ -184,7 +187,13 @@ The planning sequence ends with the before/after comparison and LSP change detai
 
 Retain the demand values, model versions, LSP changes, and before-and-after simulation results as evidence. The results should show that the 1,200 Mbps demand remains unchanged while maximum interface utilization falls from 120% to 60%, below the requested 70% target. Include the detailed routes and traffic-distribution weights where needed to explain and validate the improvement.
 
-#### 5. Check that incompatible requests are rejected
+#### 5. Apply the accepted recommendation to the lab network
+
+After checking the plan and evidence against the current lab state, CT's master asks CT's network-control function to apply the accepted SR-TE changes. The CP agent provides the recommendation; CT performs network execution. Confirm the exact chatbot command or UI action before the demo.
+
+Show the execution result, configuration read-back, and fresh network observations. Compare measured utilization with the 70% target while checking that demand and capacities remain unchanged. The 60% value above is simulated; report the actual network outcome separately. If application fails or the outcome cannot be confirmed, report that explicitly.
+
+#### 6. Check that incompatible requests are rejected
 
 The successful planning run shows what happens when the request and planning context agree. Two deliberately injected errors, submitted through CT's master to the CP agent, show how the workflow reports a violation of the agreed request contract.
 
@@ -230,29 +239,31 @@ For each rejection, retain the input submitted to CT's master, the forwarded req
 
 ## Multi-agent workflow
 
-CT's master delegates the overloaded-model task. The specialist may edit an isolated model copy and re-simulate alternatives, but has no authority to deploy live-network changes. The master checks the returned plan and supporting evidence using the checks below. Completing a specialist task, meeting the utilization target, passing master checks, and deploying a plan are separate outcomes.
+CT's master delegates the planning task. The CP agent edits an isolated model copy and returns a recommendation with evidence. CT checks it and controls application to the lab network. Specialist completion, simulated target satisfaction, master checks, network application, and the observed network outcome are separate results.
 
 ```mermaid
 sequenceDiagram
     participant O as Operator
     participant M as CT master
-    participant P as CP agent (Cisco container)
-    participant S as CT MCP server / digital twin
+    participant P as CP agent
+    participant S as CT MCP server
+    participant C as CT network control
     O->>M: Optimize A_to_D at 1200 Mbps toward 70% utilization
-    M->>P: A2A task: endpoints, objective, constraints, model revision, no live changes, evidence required
-    P->>S: MCP: topology, link capacities, utilization, service traffic
+    M->>P: A2A task: objective, constraints, model reference, evidence required
+    P->>S: MCP: agreed network-model inputs
     S-->>P: Data with identifiers, units, timestamps
-    Note over P: Check meaning, build engine input, run engine
-    P-->>M: A2A COMPLETED: SR-TE changes, before/after simulations, evidence
-    M->>M: Check task, model references, plan and evidence
-    Note over M: Temporary validation role: PASS, FAIL or INCONCLUSIVE
-    alt Evidence matches and master checks pass
-        M->>O: Present master-checked recommendation and simulated outcome
-    else Evidence missing or altered, or master checks fail or are inconclusive
-        M->>O: Report computed result with failed or incomplete checks
-        M->>P: Create linked follow-up task for correction
+    Note over P: Run planning engine and re-simulate
+    P-->>M: A2A result: SR-TE changes, simulations, evidence
+    M->>M: Check task, model, plan and evidence
+    alt Required master checks pass
+        M->>C: Apply accepted SR-TE changes to lab network
+        C-->>M: Execution status, read-back and post-change observations
+        M->>O: Report application status and observed outcome
+    else Checks fail or remain inconclusive
+        M->>O: Explain failed or incomplete checks
+        M->>P: Linked follow-up task for correction
     end
-    Note over O,M: IETF 127: no separate validator and no live network change
+    Note over O,C: IETF 127: CT master checks; execution stays in the lab
 ```
 
 ## Required result from the specialist
@@ -281,20 +292,20 @@ For IETF 127, the master checks the returned result and evidence. It does not ne
 
 **PASS:** all agreed required checks have supporting evidence and pass. **FAIL:** evidence demonstrates a required-check violation. **INCONCLUSIVE:** evidence is missing, inaccessible, or insufficient, or the master cannot perform a required check. A computed result may be well documented while missing its target; the master must report that outcome explicitly and must not present it as meeting the task's requirements.
 
-The master records its identity, check methods, evidence references, per-check outcomes, and unchecked claims. Call the recommendation **master-checked** only when the agreed required checks pass. This does not establish independent recomputation, configuration execution, or a live-network improvement.
+The master records its identity, methods, evidence references, check outcomes, and unchecked claims. Call the recommendation **master-checked** only when the required checks pass. Record network application and observations separately; master-checked alone does not mean applied or independently validated.
 
 ## Scope and success criteria
 
 | Scope | Work |
 | --- | --- |
 | Prepare | Confirm endpoints, authentication, protocol versions, application contract, model references, engine access, accessible artifacts, and the master's required checks. Keep credentials outside the repository. |
-| Core | One end-to-end A2A task with MCP data retrieval, SR-TE optimization/re-simulation, an inspectable change artifact, and a master check record. |
+| Core | A2A delegation, MCP data retrieval, SR-TE plan and evidence returned, master checks, then application to the lab network and post-change read-back. |
 | Core checks | Reproduce the lab progression, run both rejection checks through CT's master, and distinguish a completed specialist task from a result whose master checks fail or remain inconclusive. Investigate organic integration mismatches if they arise; no such mismatch is a valid finding. |
-| Core output | A reproducible exchange, the task/result contract and mappings, proposed changes and evidence, the master's check record, and a short findings report. |
-| Stretch | Independent contract consumer; additional status, semantic, evidence-binding or changed-snapshot tests; isolated emulator execution and traffic measurement. These are not required for the first demonstration. |
-| Deferred | Separate validation agent, planned for IETF 128; lifecycle, intervention/recovery, live ingestion, production authorization tests, and live-network changes. |
+| Core output | The agent exchange and contract mappings, proposed changes and evidence, master checks, network-application record, observed outcome, and short findings report. |
+| Stretch | Independent contract consumer; additional status, semantic, evidence-binding or changed-snapshot tests. |
+| Deferred | Separate validation agent, planned for IETF 128; lifecycle, intervention/recovery, continuous telemetry ingestion, and production-network deployment. |
 
-The existing local scenario is the baseline demonstration, not a benchmark of the planning engine. Retain the distinction between specialist computation, master checks, and any later device execution.
+The planning engine supports the agent-interaction demonstration. Keep its simulated result, CT's checks, network execution, and observed outcome distinct.
 
 ## Proposed wording on what the findings can establish
 
@@ -308,6 +319,7 @@ Record whether each finding arose during integration or was deliberately injecte
 - Confirm the application contract and CT status mapping, including the distinction between specialist completion and master checks.
 - Use the agreed MCP input specification; confirm model-reference consistency between master and specialist.
 - Confirm accessible SR-TE change artifacts, check methods, and PASS/FAIL/INCONCLUSIVE handling.
+- Confirm CT's application command or UI action, execution-status mapping, and post-change read-back. Resolve the documented demand-update status discrepancy.
 
 ## Supporting material
 
