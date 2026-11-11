@@ -1,5 +1,7 @@
 # AINETOPS IETF 127 hackathon
 
+![CT master delegates to the CP agent over A2A. The CP agent retrieves agreed network data from CT's MCP server and returns a recommendation with evidence. CT checks and controls network application.](assets/agent-interaction-overview.svg)
+
 ## In brief
 
 China Telecom (CT) and Cisco will demonstrate **agent-to-agent network management**. CT's master delegates bandwidth-aware SR-TE planning to Cisco's capacity-planning agent (the **CP agent**) over A2A. The CP agent uses the agreed model data from CT's MCP server and returns proposed changes with simulation evidence. CT's master checks the result and coordinates application to the lab network. The focus is the exchange of tasks, constraints, results, evidence, and errors between the agents.
