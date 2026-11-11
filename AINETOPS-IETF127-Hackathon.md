@@ -263,7 +263,7 @@ sequenceDiagram
         M->>O: Explain failed or incomplete checks
         M->>P: Linked follow-up task for correction
     end
-    Note over O,C: IETF 127: CT master checks; execution stays in the lab
+    Note over O,C: IETF 127 - CT master checks and lab network execution
 ```
 
 ## Required result from the specialist
