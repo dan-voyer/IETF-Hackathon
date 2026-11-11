@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="820" viewBox="0 0 1320 820" role="img" aria-labelledby="title desc">
+  <title id="title">Agent interaction at a glance</title>
+  <desc id="desc">CT's master delegates a planning task to Cisco's capacity-planning agent over A2A and receives a recommendation with evidence. The CP agent's MCP client requests agreed model data from CT's read-only MCP server. CT retains control of applying accepted changes to the lab network.</desc>
+  <defs>
+    <marker id="blue-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#2563eb"/></marker>
+    <marker id="teal-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#087f8c"/></marker>
+    <marker id="gray-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#64748b"/></marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; }
+      .ink { fill: #142c45; }
+      .muted { fill: #53677e; }
+      .blue { fill: #1d4ed8; }
+      .teal { fill: #087f8c; }
+      .heading { font-size: 27px; font-weight: 700; }
+      .body { font-size: 19px; }
+      .small { font-size: 17px; }
+      .label { font-size: 21px; font-weight: 700; }
+    </style>
+  </defs>
+  <rect width="1320" height="820" rx="20" fill="#ffffff"/>
+  <text x="36" y="49" class="ink" font-size="31" font-weight="700">Agent interaction at a glance</text>
+  <text x="36" y="83" class="muted" font-size="20">A2A carries the task and result. MCP provides the network data.</text>
+
+  <rect x="32" y="116" width="436" height="642" rx="22" fill="#f0f5fb" stroke="#d6e2ef" stroke-width="2"/>
+  <text x="56" y="156" class="ink" font-size="21" font-weight="700">CT AGENTIC PLATFORM</text>
+  <rect x="908" y="116" width="380" height="642" rx="22" fill="#f0f8f6" stroke="#cde7df" stroke-width="2"/>
+  <text x="932" y="156" class="ink" font-size="21" font-weight="700">CISCO SPECIALIST</text>
+
+  <rect x="56" y="195" width="388" height="198" rx="17" fill="#ffffff" stroke="#8cafe3" stroke-width="2"/>
+  <circle cx="99" cy="244" r="27" fill="#e8f0ff"/>
+  <g fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="84" y="234" width="30" height="24" rx="7"/>
+    <path d="M99 228v6 M90 258v5 M108 258v5"/>
+    <circle cx="99" cy="225" r="2" fill="#2563eb"/>
+    <circle cx="92" cy="244" r="1.5" fill="#2563eb"/>
+    <circle cx="106" cy="244" r="1.5" fill="#2563eb"/>
+    <path d="M94 251h10"/>
+  </g>
+  <text x="139" y="242" class="heading ink">CT master agent</text>
+  <text x="139" y="271" class="body muted">Delegates and checks</text>
+  <line x1="80" y1="293" x2="420" y2="293" stroke="#e2e8f0"/>
+  <text x="80" y="327" class="body ink">Sets the goal and constraints</text>
+  <text x="80" y="360" class="body ink">Checks the plan and evidence</text>
+
+  <rect x="928" y="195" width="340" height="433" rx="17" fill="#ffffff" stroke="#7abca8" stroke-width="2"/>
+  <circle cx="969" cy="244" r="27" fill="#e5f5ee"/>
+  <g fill="none" stroke="#118064" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="954" y="234" width="30" height="24" rx="7"/>
+    <path d="M969 228v6 M960 258v5 M978 258v5"/>
+    <circle cx="969" cy="225" r="2" fill="#118064"/>
+    <circle cx="962" cy="244" r="1.5" fill="#118064"/>
+    <circle cx="976" cy="244" r="1.5" fill="#118064"/>
+    <path d="M964 251h10"/>
+  </g>
+  <text x="1009" y="242" class="heading ink">CP agent</text>
+  <text x="1009" y="271" class="body muted">Capacity planning</text>
+  <rect x="950" y="307" width="296" height="112" rx="12" fill="#f4f8fc" stroke="#d9e3ed"/>
+  <g stroke="#657f99" stroke-width="2" fill="#ffffff">
+    <path d="M974 338l15 13 15-13 M989 351v14" fill="none"/>
+    <circle cx="974" cy="338" r="4"/><circle cx="1004" cy="338" r="4"/><circle cx="989" cy="365" r="4"/>
+  </g>
+  <text x="1022" y="351" class="ink" font-size="22" font-weight="700">Planning engine</text>
+  <text x="968" y="391" class="muted small">Simulates and optimizes SR-TE</text>
+  <text x="950" y="453" class="ink body">Builds the plan and evidence</text>
+  <rect x="950" y="481" width="296" height="121" rx="12" fill="#eaf7f7" stroke="#b5dfe1"/>
+  <g stroke="#087f8c" stroke-width="2.5" fill="none" stroke-linecap="round">
+    <path d="M970 513h25 M986 507l9 6-9 6 M995 532h-25 M979 526l-9 6 9 6"/>
+  </g>
+  <text x="1010" y="525" class="teal" font-size="23" font-weight="700">MCP client</text>
+  <text x="968" y="564" class="muted small">Requests agreed model inputs</text>
+  <text x="968" y="587" class="muted small">from the CT platform</text>
+
+  <rect x="56" y="468" width="388" height="160" rx="17" fill="#ffffff" stroke="#79b8c0" stroke-width="2"/>
+  <g stroke="#087f8c" stroke-width="2.2" fill="none">
+    <rect x="81" y="492" width="31" height="14" rx="3"/>
+    <rect x="81" y="510" width="31" height="14" rx="3"/>
+    <circle cx="87" cy="499" r="1.5" fill="#087f8c"/>
+    <circle cx="87" cy="517" r="1.5" fill="#087f8c"/>
+    <path d="M96 499h10 M96 517h10"/>
+  </g>
+  <text x="131" y="506" class="heading ink">CT MCP server</text>
+  <text x="131" y="535" class="muted body">Read-only data access</text>
+  <text x="80" y="575" class="ink body">Topology · capacity · utilization</text>
+  <text x="80" y="604" class="muted small">Identifiers · units · model reference</text>
+
+  <path d="M444 257H924" stroke="#2563eb" stroke-width="4" fill="none" marker-end="url(#blue-arrow)"/>
+  <text x="686" y="240" text-anchor="middle" class="label blue">A2A · Delegate task</text>
+  <path d="M928 350H448" stroke="#2563eb" stroke-width="4" fill="none" marker-end="url(#blue-arrow)"/>
+  <text x="686" y="330" text-anchor="middle" class="label blue">A2A · Return recommendation</text>
+  <text x="686" y="378" text-anchor="middle" class="muted small">SR-TE changes + simulation evidence</text>
+
+  <path d="M928 516H448" stroke="#087f8c" stroke-width="3.5" fill="none" marker-end="url(#teal-arrow)"/>
+  <text x="686" y="496" text-anchor="middle" class="label teal">MCP · Request model data</text>
+  <path d="M444 594H924" stroke="#087f8c" stroke-width="3.5" fill="none" marker-end="url(#teal-arrow)"/>
+  <text x="686" y="574" text-anchor="middle" class="label teal">MCP · Return agreed snapshot</text>
+
+  <path d="M250 668V633" stroke="#64748b" stroke-width="2.5" fill="none" marker-end="url(#gray-arrow)"/>
+  <rect x="56" y="670" width="388" height="65" rx="12" fill="#e4edf7"/>
+  <g stroke="#617e9e" stroke-width="2" fill="#f8fbff">
+    <path d="M87 691l24 21 24-21 M87 691h48" fill="none"/>
+    <circle cx="87" cy="691" r="5"/><circle cx="111" cy="712" r="5"/><circle cx="135" cy="691" r="5"/>
+  </g>
+  <text x="160" y="697" class="ink" font-size="20" font-weight="700">Agreed network snapshot</text>
+  <text x="160" y="721" class="muted small">Prepared lab inputs</text>
+
+  <text x="950" y="680" class="ink body" font-weight="700">One specialist agent</text>
+  <text x="950" y="709" class="muted small">Calls the planning engine and</text>
+  <text x="950" y="733" class="muted small">uses an MCP client for data.</text>
+
+  <text x="36" y="797" class="ink" font-size="20">CT checks the recommendation and controls application of accepted changes to the lab network.</text>
+</svg>
