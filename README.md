@@ -14,6 +14,7 @@ The focus is **agent-to-agent interaction**: task meaning, constraints, status, 
 
 ## Start here
 
+- [Presentation slides (PDF)](AINETOPS-%20Network-Management%20Agent%20Interoperability.pdf): slides used for the IETF 127 hackathon presentation.
 - [Demo script](AINETOPS-IETF127-Hackathon.md): operator commands, scenario, rejection tests, master checks, and application to the lab network.
 - [Technical reference](AINETOPS-IETF127-Technical-Reference.md): task/status/evidence mappings, illustrative contract, and reporting guidance.
 
