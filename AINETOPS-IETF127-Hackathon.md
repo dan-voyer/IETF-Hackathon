@@ -6,8 +6,6 @@ China Telecom (CT) and Cisco will demonstrate **agent-to-agent network managemen
 
 The first event lasts a day and a half. **CT's master temporarily performs the validation role at IETF 127.** A separate validation agent is planned for IETF 128. Report the **master-checked** recommendation, network application, and observed outcome separately; master checks do not constitute independent validation.
 
-**Review pointer:** [Proposed wording on what the findings can establish](#proposed-wording-on-what-the-findings-can-establish) is marked for team review.
-
 ![CT master delegates to the CP agent over A2A. The CP agent retrieves agreed network data from CT's MCP server and returns a recommendation with evidence. CT checks and controls network application.](assets/agent-interaction-overview.svg)
 
 ## What we will demonstrate
@@ -312,11 +310,13 @@ The master records its identity, methods, evidence references, check outcomes, a
 
 The planning engine supports the agent-interaction demonstration. Keep its simulated result, CT's checks, network execution, and observed outcome distinct.
 
-## Proposed wording on what the findings can establish
+## What we are documenting
 
-> **Proposal for review:** The hackathon will document which task, result, and evidence meanings the two implementations exchange successfully, what additional agreements are required, and how those agreements are represented. Findings will distinguish implementation or configuration issues, reusable application profiles or mappings, and candidate specification gaps. Additional integration effort alone does not establish a standards gap. Where existing mechanisms and the documented contract are sufficient, that is a positive result. The report may inform AINETOPS and related work, but one integration does not establish an industry-wide requirement for a new protocol, profile, or working group.
+We are documenting how CT's master and the CP agent exchange tasks, results, and evidence, which additional agreements are needed, and how those agreements are represented. Our findings distinguish implementation and configuration issues, reusable application profiles or mappings, and candidate specification gaps. Where existing mechanisms and the agreed contract are sufficient, we record that as a positive result.
 
-Record whether each finding arose during integration or was deliberately injected. For candidate gaps, identify the conflicting interpretations, operational consequence, existing mechanisms considered, and whether another implementation could reuse the resolution without bilateral clarification. Detailed reporting guidance is in the [technical reference](AINETOPS-IETF127-Technical-Reference.md#making-the-findings-credible).
+For each finding, we record whether it arose during integration or was deliberately injected. For candidate gaps, we identify the conflicting interpretations, operational consequence, existing mechanisms considered, and whether another implementation could reuse the resolution without bilateral clarification. Detailed reporting guidance is in the [technical reference](AINETOPS-IETF127-Technical-Reference.md#making-the-findings-credible).
+
+These findings provide input to AINETOPS and related work. Additional integration effort alone does not establish a standards gap, and one integration does not establish an industry-wide requirement for a new protocol, profile, or working group.
 
 ## Remaining coordination
 
