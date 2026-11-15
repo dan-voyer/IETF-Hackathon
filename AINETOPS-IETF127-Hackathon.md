@@ -36,7 +36,10 @@ The current CT interface executes these planning requests without a separate app
 | 4 | `run simulation` | Overloaded baseline: 120% modeled utilization, three interfaces above 100%, and reported health **Critical**. A successful simulation can report an unhealthy network. |
 | 5 | `lower utilization to 70% with details` | Show the SR-TE changes and re-simulation: the recorded run reaches 60% maximum utilization while retaining 1,200 Mbps demand and 1,000 Mbps interface capacities. |
 | 6 | Apply the accepted SR-TE plan through CT's master. **Confirm the exact command or UI action with CT.** | Execution status, configuration read-back, and post-change network observations, separate from the simulated 60% result. |
-| 7 | In the **CT master agent's chatbot**, submit the two structured inputs in [section 6](#6-check-that-incompatible-requests-are-rejected), one at a time. | Show each returned rejection and its request/response trace. |
+| 7 | `change demand A_to_D traffic to 1200 percent` | Unsupported-unit rejection (`input_invalid`): demand traffic must use `Mbps`, not `percent`. Show the returned rejection and request/response trace. |
+| 8 | `run simulation and expected_plan_key 00000000-0000-0000-0000-000000000000` | Planning-context rejection (`constraint_rejected`): the supplied plan key does not match the active CP plan. Show the returned rejection and request/response trace. |
+
+Steps 7–8 are deliberate rejection tests, run through CT's master. See [section 6](#6-check-that-incompatible-requests-are-rejected) for the constraints and evidence to check.
 
 **Optional CP-agent check:** use `list demand` in the CP-agent interface to inspect `A_to_D`, its endpoints, and its traffic value. It is not a required CT master command; the tested CT chatbot returned a help message for this input.
 
@@ -199,7 +202,7 @@ Show the execution result, configuration read-back, and fresh network observatio
 
 The successful planning run shows what happens when the request and planning context agree. Two deliberately injected errors, submitted through CT's master to the CP agent, show how the workflow reports a violation of the agreed request contract.
 
-**Where to run these checks:** paste each structured input below into the **CT master agent's chatbot**, one at a time, and wait for the response. Keep `prompt` and `constraints` unchanged through the handoff to the CP agent, including the deliberately unsupported unit and non-matching plan key. Show the rejection returned through CT's master and use the request/response trace to confirm which constraint was rejected.
+**Where to run these checks:** enter the commands in quick-reference steps 7 and 8 into the **CT master agent's chatbot**, one at a time, and wait for the response. The structured examples below show the corresponding request constraints. Preserve the deliberately unsupported unit and non-matching plan key through the handoff to the CP agent. Show the rejection returned through CT's master and use the request/response trace to confirm which constraint was rejected.
 
 **Test A — unsupported traffic unit**
 
